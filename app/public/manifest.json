@@ -1,0 +1,15 @@
+{
+  "name": "Mitsume",
+  "short_name": "Mitsume",
+  "description": "Personal, local-first notes.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#E66000",
+  "background_color": "#ffffff",
+  "icons": [
+    { "src": "/icons/pwa-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icons/pwa-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icons/pwa-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
