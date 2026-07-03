@@ -63,3 +63,8 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/** Brand accent (matches the app icon). */
+export const AccentColor = '#E66000';
+/** Destructive actions / validation errors. */
+export const DangerColor = '#B3261E';

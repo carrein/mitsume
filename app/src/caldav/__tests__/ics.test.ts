@@ -49,6 +49,44 @@ describe('editPreserving', () => {
     const out = editPreserving(APPLE_EVENT, { summary: 'x' });
     expect(out).toMatch(/SEQUENCE:3/); // 2 -> 3
   });
+
+  it('leaves DTSTART;TZID byte-identical on a title-only edit', () => {
+    const out = editPreserving(APPLE_EVENT, { summary: 'x' });
+    expect(out).toContain('DTSTART;TZID=Asia/Singapore:20260605T130000');
+    expect(out).toContain('DTEND;TZID=Asia/Singapore:20260605T134500');
+  });
+
+  it('rewrites times as UTC without leaving a stale TZID parameter', () => {
+    const out = editPreserving(APPLE_EVENT, {
+      start: new Date('2026-06-05T06:00:00Z'),
+      end: new Date('2026-06-05T07:00:00Z'),
+      allDay: false,
+    });
+    expect(out).toContain('DTSTART:20260605T060000Z');
+    expect(out).not.toMatch(/DTSTART;TZID/);
+  });
+
+  it('keeps all-day events VALUE=DATE with a non-inclusive DTEND', () => {
+    const allDayEvent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//test//EN',
+      'BEGIN:VEVENT',
+      'UID:ALLDAY-1',
+      'DTSTAMP:20260601T000000Z',
+      'DTSTART;VALUE=DATE:20260621',
+      'DTEND;VALUE=DATE:20260622',
+      'SUMMARY:👽 Xuan',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const day = new Date(2026, 6, 10); // 2026-07-10 local
+    const out = editPreserving(allDayEvent, { start: day, end: day, allDay: true });
+    expect(out).toContain('DTSTART;VALUE=DATE:20260710');
+    expect(out).toContain('DTEND;VALUE=DATE:20260711'); // +1 day, non-inclusive
+    expect(out).toContain('SUMMARY:👽 Xuan'); // emoji + untouched fields survive
+  });
 });
 
 describe('buildEventICS', () => {

@@ -27,7 +27,12 @@ export type EventInput = {
   description?: string;
 };
 
-/** Editable fields (whole-series; single-occurrence editing is deferred). */
+/**
+ * Editable fields (whole-series; single-occurrence editing is deferred). Include only
+ * fields that actually changed — untouched properties (e.g. an Apple TZID DTSTART)
+ * are then left byte-identical. `allDay` describes how start/end should be written
+ * and must be set whenever start/end are present.
+ */
 export type EventChanges = Partial<
-  Pick<EventInput, 'summary' | 'start' | 'end' | 'location' | 'description'>
+  Pick<EventInput, 'summary' | 'start' | 'end' | 'location' | 'description' | 'allDay'>
 >;
