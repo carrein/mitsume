@@ -30,7 +30,11 @@ export function useMonthEvents(visibleMonth: Date) {
       setEvents(result);
     } catch (err) {
       if (seq.current !== ticket) return;
-      setError(err instanceof Error ? err.message : 'Could not reach the calendar server');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not reach the calendar server'
+      );
     } finally {
       if (seq.current === ticket) setLoading(false);
     }

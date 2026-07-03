@@ -13,7 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { restoreEvent } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
-import { EventEditor, type EditorResult } from '@/components/calendar/event-editor';
+import {
+  EventEditor,
+  type EditorResult,
+} from '@/components/calendar/event-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -57,25 +60,40 @@ export function MonthScreen() {
   const markedDates = useMemo(() => {
     const marks: Record<
       string,
-      { marked?: boolean; dotColor?: string; selected?: boolean; selectedColor?: string }
+      {
+        marked?: boolean;
+        dotColor?: string;
+        selected?: boolean;
+        selectedColor?: string;
+      }
     > = {};
     for (const event of events) {
       for (const day of eventDays(event.start, event.end)) {
         marks[day] ??= { marked: true, dotColor: AccentColor };
       }
     }
-    marks[selectedDay] = { ...marks[selectedDay], selected: true, selectedColor: AccentColor };
+    marks[selectedDay] = {
+      ...marks[selectedDay],
+      selected: true,
+      selectedColor: AccentColor,
+    };
     return marks;
   }, [events, selectedDay]);
 
   const dayEvents = useMemo(
     () =>
       events
-        .filter((event) => eventDays(event.start, event.end).includes(selectedDay))
+        .filter((event) =>
+          eventDays(event.start, event.end).includes(selectedDay)
+        )
         .sort((a, b) =>
-          a.allDay !== b.allDay ? (a.allDay ? -1 : 1) : a.start.getTime() - b.start.getTime(),
+          a.allDay !== b.allDay
+            ? a.allDay
+              ? -1
+              : 1
+            : a.start.getTime() - b.start.getTime()
         ),
-    [events, selectedDay],
+    [events, selectedDay]
   );
 
   function onEditorDone(result: EditorResult) {
@@ -94,7 +112,9 @@ export function MonthScreen() {
       await restoreEvent(event);
       refresh();
     } catch (err) {
-      setSnack({ message: err instanceof Error ? err.message : 'Could not restore event' });
+      setSnack({
+        message: err instanceof Error ? err.message : 'Could not restore event',
+      });
     }
   }
 
@@ -106,9 +126,9 @@ export function MonthScreen() {
             <ThemedText type="subtitle">Connect your calendar</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               Copy <ThemedText type="code">app/.env.example</ThemedText> to{' '}
-              <ThemedText type="code">app/.env</ThemedText> and fill in your Radicale URL,
-              username, and app password. Then restart the dev server (env vars are baked in
-              at build time).
+              <ThemedText type="code">app/.env</ThemedText> and fill in your
+              Radicale URL, username, and app password. Then restart the dev
+              server (env vars are baked in at build time).
             </ThemedText>
           </ThemedView>
         </View>
@@ -167,7 +187,11 @@ export function MonthScreen() {
             <ThemedText type="smallBold">{selectedDayLabel}</ThemedText>
             <Pressable onPress={refresh} hitSlop={8}>
               <SymbolView
-                name={{ ios: 'arrow.clockwise', android: 'refresh', web: 'refresh' }}
+                name={{
+                  ios: 'arrow.clockwise',
+                  android: 'refresh',
+                  web: 'refresh',
+                }}
                 size={16}
                 tintColor={theme.textSecondary}
               />
@@ -182,15 +206,23 @@ export function MonthScreen() {
               keyExtractor={(event) => event.id}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={
-                <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+                <ThemedText
+                  type="small"
+                  themeColor="textSecondary"
+                  style={styles.empty}
+                >
                   No events
                 </ThemedText>
               }
               renderItem={({ item }) => (
-                <Pressable onPress={() => setEditor({ mode: 'edit', event: item })}>
+                <Pressable
+                  onPress={() => setEditor({ mode: 'edit', event: item })}
+                >
                   {({ pressed }) => (
                     <ThemedView
-                      type={pressed ? 'backgroundSelected' : 'backgroundElement'}
+                      type={
+                        pressed ? 'backgroundSelected' : 'backgroundElement'
+                      }
                       style={styles.eventRow}
                     >
                       <View style={styles.eventTime}>
@@ -200,7 +232,9 @@ export function MonthScreen() {
                           </ThemedText>
                         ) : (
                           <>
-                            <ThemedText type="small">{toTimeString(item.start)}</ThemedText>
+                            <ThemedText type="small">
+                              {toTimeString(item.start)}
+                            </ThemedText>
                             <ThemedText type="small" themeColor="textSecondary">
                               {toTimeString(item.end)}
                             </ThemedText>
@@ -208,9 +242,15 @@ export function MonthScreen() {
                         )}
                       </View>
                       <View style={styles.eventBody}>
-                        <ThemedText numberOfLines={1}>{item.summary || '(untitled)'}</ThemedText>
+                        <ThemedText numberOfLines={1}>
+                          {item.summary || '(untitled)'}
+                        </ThemedText>
                         {item.location ? (
-                          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                          <ThemedText
+                            type="small"
+                            themeColor="textSecondary"
+                            numberOfLines={1}
+                          >
                             {item.location}
                           </ThemedText>
                         ) : null}
@@ -262,7 +302,10 @@ export function MonthScreen() {
   );
 }
 
-const bottomInset = Platform.select({ web: Spacing.four, default: BottomTabInset + Spacing.three });
+const bottomInset = Platform.select({
+  web: Spacing.four,
+  default: BottomTabInset + Spacing.three,
+});
 
 const styles = StyleSheet.create({
   container: {

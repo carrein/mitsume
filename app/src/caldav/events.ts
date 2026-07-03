@@ -20,7 +20,10 @@ function ensureOk(res: Response, action: string): void {
 }
 
 /** Fetch + expand all events overlapping [rangeStart, rangeEnd). */
-export async function fetchMonth(rangeStart: Date, rangeEnd: Date): Promise<CalEvent[]> {
+export async function fetchMonth(
+  rangeStart: Date,
+  rangeEnd: Date
+): Promise<CalEvent[]> {
   const client = await getClient();
   const calendar = await getDefaultCalendar();
   const objects = await client.fetchCalendarObjects({
@@ -31,7 +34,9 @@ export async function fetchMonth(rangeStart: Date, rangeEnd: Date): Promise<CalE
   const events: CalEvent[] = [];
   for (const obj of objects) {
     if (!obj.data) continue;
-    events.push(...expandEvents(obj.data, obj.url, obj.etag ?? '', rangeStart, rangeEnd));
+    events.push(
+      ...expandEvents(obj.data, obj.url, obj.etag ?? '', rangeStart, rangeEnd)
+    );
   }
   return events;
 }
@@ -48,7 +53,10 @@ export async function createEvent(input: EventInput): Promise<void> {
   ensureOk(res, 'create');
 }
 
-export async function updateEvent(event: CalEvent, changes: EventChanges): Promise<void> {
+export async function updateEvent(
+  event: CalEvent,
+  changes: EventChanges
+): Promise<void> {
   const client = await getClient();
   const res = await client.updateCalendarObject({
     calendarObject: {

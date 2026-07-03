@@ -17,7 +17,10 @@ export function toTimeString(d: Date): string {
  * Fetch window for a visible month: [1st − 7d, last + 7d). Covers the adjacent-month
  * days shown in the grid without a second request.
  */
-export function monthFetchRange(anyDayInMonth: Date): { start: Date; end: Date } {
+export function monthFetchRange(anyDayInMonth: Date): {
+  start: Date;
+  end: Date;
+} {
   const y = anyDayInMonth.getFullYear();
   const m = anyDayInMonth.getMonth();
   return { start: new Date(y, m, 1 - 7), end: new Date(y, m + 1, 1 + 7) };
@@ -31,7 +34,11 @@ export function monthFetchRange(anyDayInMonth: Date): { start: Date; end: Date }
 export function eventDays(start: Date, end: Date): string[] {
   const lastMs = Math.max(start.getTime(), end.getTime() - 1);
   const days: string[] = [];
-  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const cursor = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate()
+  );
   while (cursor.getTime() <= lastMs && days.length < 62) {
     days.push(toDateString(cursor));
     cursor.setDate(cursor.getDate() + 1);
@@ -49,7 +56,12 @@ export function parseDayTime(day: string, time: string): Date | null {
   if (hh > 23 || mm > 59) return null;
   const date = new Date(y, m - 1, d, hh, mm);
   // Reject silent rollover (e.g. 2026-02-31).
-  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  if (
+    date.getFullYear() !== y ||
+    date.getMonth() !== m - 1 ||
+    date.getDate() !== d
+  )
+    return null;
   return date;
 }
 

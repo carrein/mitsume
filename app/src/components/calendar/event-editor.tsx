@@ -9,15 +9,30 @@ import {
   View,
 } from 'react-native';
 
-import { ConflictError, createEvent, deleteEvent, updateEvent } from '@/caldav/events';
+import {
+  ConflictError,
+  createEvent,
+  deleteEvent,
+  updateEvent,
+} from '@/caldav/events';
 import type { CalEvent, EventChanges } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { nextFullHour, parseDay, parseDayTime, toDateString, toTimeString } from '@/utils/date';
+import {
+  nextFullHour,
+  parseDay,
+  parseDayTime,
+  toDateString,
+  toTimeString,
+} from '@/utils/date';
 
-export type EditorResult = 'created' | 'updated' | { deleted: CalEvent } | 'conflict';
+export type EditorResult =
+  | 'created'
+  | 'updated'
+  | { deleted: CalEvent }
+  | 'conflict';
 
 type Props = {
   /** Event being edited, or null to create a new one. */
@@ -38,9 +53,13 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
 
   const [summary, setSummary] = useState(event?.summary ?? '');
   const [allDay, setAllDay] = useState(event?.allDay ?? false);
-  const [day, setDay] = useState(toDateString(event?.start ?? parseDay(defaultDay) ?? new Date()));
+  const [day, setDay] = useState(
+    toDateString(event?.start ?? parseDay(defaultDay) ?? new Date())
+  );
   const [startTime, setStartTime] = useState(() =>
-    event && !event.allDay ? toTimeString(event.start) : toTimeString(nextFullHour(new Date())),
+    event && !event.allDay
+      ? toTimeString(event.start)
+      : toTimeString(nextFullHour(new Date()))
   );
   const [endTime, setEndTime] = useState(() => {
     if (event && !event.allDay) return toTimeString(event.end);
@@ -77,7 +96,9 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
     const times = resolveTimes();
     if (!times) {
       setProblem(
-        allDay ? 'Date must be YYYY-MM-DD' : 'Check date (YYYY-MM-DD) and times (HH:MM, end after start)',
+        allDay
+          ? 'Date must be YYYY-MM-DD'
+          : 'Check date (YYYY-MM-DD) and times (HH:MM, end after start)'
       );
       return;
     }
@@ -101,13 +122,16 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
       // (keeps Apple TZID DTSTARTs intact on title-only edits).
       const changes: EventChanges = {};
       if (trimmed !== event.summary) changes.summary = trimmed;
-      if (location.trim() !== (event.location ?? '')) changes.location = location.trim();
-      if (description.trim() !== (event.description ?? '')) changes.description = description.trim();
+      if (location.trim() !== (event.location ?? ''))
+        changes.location = location.trim();
+      if (description.trim() !== (event.description ?? ''))
+        changes.description = description.trim();
       const timesChanged =
         allDay !== event.allDay ||
         toDateString(event.start) !== day ||
         (!allDay &&
-          (toTimeString(event.start) !== startTime || toTimeString(event.end) !== endTime));
+          (toTimeString(event.start) !== startTime ||
+            toTimeString(event.end) !== endTime));
       if (timesChanged) {
         changes.start = times.start;
         changes.end = times.end;
@@ -147,7 +171,10 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <ThemedView type="backgroundElement" style={styles.card}>
-          <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.form}
+            keyboardShouldPersistTaps="handled"
+          >
             <ThemedText type="subtitle" style={styles.title}>
               {event ? 'Edit event' : 'New event'}
             </ThemedText>
@@ -242,14 +269,22 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
 
             <View style={styles.actions}>
               {event && (
-                <Pressable onPress={remove} disabled={busy} style={busy && styles.disabled}>
+                <Pressable
+                  onPress={remove}
+                  disabled={busy}
+                  style={busy && styles.disabled}
+                >
                   <ThemedText type="smallBold" style={{ color: DangerColor }}>
                     Delete
                   </ThemedText>
                 </Pressable>
               )}
               <View style={styles.actionsRight}>
-                <Pressable onPress={onClose} disabled={busy} style={busy && styles.disabled}>
+                <Pressable
+                  onPress={onClose}
+                  disabled={busy}
+                  style={busy && styles.disabled}
+                >
                   <ThemedText type="smallBold" themeColor="textSecondary">
                     Cancel
                   </ThemedText>

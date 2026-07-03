@@ -14,7 +14,7 @@ export function expandEvents(
   url: string,
   etag: string,
   rangeStart: Date,
-  rangeEnd: Date,
+  rangeEnd: Date
 ): CalEvent[] {
   const expander = new IcalExpander({ ics, maxIterations: 1000 });
   const { events, occurrences } = expander.between(rangeStart, rangeEnd);
@@ -52,7 +52,7 @@ function toAllDayTime(d: Date) {
       day: d.getDate(),
       isDate: true,
     },
-    ICAL.Timezone.localTimezone,
+    ICAL.Timezone.localTimezone
   );
 }
 
@@ -92,8 +92,10 @@ export function buildEventICS(input: EventInput, uid: string): string {
   event.startDate = start;
   event.endDate = end;
 
-  if (input.location) vevent.updatePropertyWithValue('location', input.location);
-  if (input.description) vevent.updatePropertyWithValue('description', input.description);
+  if (input.location)
+    vevent.updatePropertyWithValue('location', input.location);
+  if (input.description)
+    vevent.updatePropertyWithValue('description', input.description);
   vevent.updatePropertyWithValue('dtstamp', ICAL.Time.now());
 
   vcalendar.addSubcomponent(vevent);
@@ -115,11 +117,16 @@ export function editPreserving(ics: string, changes: EventChanges): string {
 
   if (changes.summary !== undefined) event.summary = changes.summary;
   if (changes.location !== undefined) event.location = changes.location;
-  if (changes.description !== undefined) event.description = changes.description;
+  if (changes.description !== undefined)
+    event.description = changes.description;
   if (changes.start && changes.end) {
     // Event setters replace the TZID parameter / value type instead of leaving a
     // stale `;TZID=` next to a rewritten value (updatePropertyWithValue would).
-    const { start, end } = toTimePair(changes.start, changes.end, changes.allDay ?? false);
+    const { start, end } = toTimePair(
+      changes.start,
+      changes.end,
+      changes.allDay ?? false
+    );
     event.startDate = start;
     event.endDate = end;
   }

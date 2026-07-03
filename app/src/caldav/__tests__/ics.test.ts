@@ -82,7 +82,11 @@ describe('editPreserving', () => {
     ].join('\r\n');
 
     const day = new Date(2026, 6, 10); // 2026-07-10 local
-    const out = editPreserving(allDayEvent, { start: day, end: day, allDay: true });
+    const out = editPreserving(allDayEvent, {
+      start: day,
+      end: day,
+      allDay: true,
+    });
     expect(out).toContain('DTSTART;VALUE=DATE:20260710');
     expect(out).toContain('DTEND;VALUE=DATE:20260711'); // +1 day, non-inclusive
     expect(out).toContain('SUMMARY:👽 Xuan'); // emoji + untouched fields survive
@@ -98,7 +102,7 @@ describe('buildEventICS', () => {
         end: new Date('2026-07-02T13:00:00Z'),
         allDay: false,
       },
-      'UID-2',
+      'UID-2'
     );
 
     expect(ics).toContain('BEGIN:VEVENT');

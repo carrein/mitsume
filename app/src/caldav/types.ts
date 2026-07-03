@@ -34,5 +34,8 @@ export type EventInput = {
  * and must be set whenever start/end are present.
  */
 export type EventChanges = Partial<
-  Pick<EventInput, 'summary' | 'start' | 'end' | 'location' | 'description' | 'allDay'>
+  Pick<
+    EventInput,
+    'summary' | 'start' | 'end' | 'location' | 'description' | 'allDay'
+  >
 >;

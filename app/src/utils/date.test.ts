@@ -1,4 +1,10 @@
-import { eventDays, monthFetchRange, nextFullHour, parseDayTime, toDateString } from './date';
+import {
+  eventDays,
+  monthFetchRange,
+  nextFullHour,
+  parseDayTime,
+  toDateString,
+} from './date';
 
 describe('toDateString', () => {
   it('formats local dates with zero padding', () => {
@@ -18,12 +24,14 @@ describe('monthFetchRange', () => {
 describe('eventDays', () => {
   it('covers a timed event on a single day', () => {
     expect(
-      eventDays(new Date(2026, 6, 2, 15, 0), new Date(2026, 6, 2, 16, 0)),
+      eventDays(new Date(2026, 6, 2, 15, 0), new Date(2026, 6, 2, 16, 0))
     ).toEqual(['2026-07-02']);
   });
 
   it('treats the end as exclusive (all-day non-inclusive DTEND)', () => {
-    expect(eventDays(new Date(2026, 6, 2), new Date(2026, 6, 3))).toEqual(['2026-07-02']);
+    expect(eventDays(new Date(2026, 6, 2), new Date(2026, 6, 3))).toEqual([
+      '2026-07-02',
+    ]);
   });
 
   it('spans multi-day events', () => {
