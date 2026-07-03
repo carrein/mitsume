@@ -1,0 +1,47 @@
+name: Web image
+
+# Build the static web app into ghcr.io/carrein/mitsume:latest on every push to
+# main that touches the app. Watchtower on the server polls GHCR and redeploys
+# automatically (see docs/Deploy.md).
+#
+# Optional repo secrets DAV_USER / DAV_PASS bake CalDAV credentials into the
+# bundle (first-cut credential model — keep the GHCR package PRIVATE). Without
+# them the deployed app shows its "Connect your calendar" setup card.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/web-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          tags: |
+            ghcr.io/carrein/mitsume:latest
+            ghcr.io/carrein/mitsume:${{ github.sha }}
+          build-args: |
+            EXPO_PUBLIC_DAV_URL=/dav/
+            EXPO_PUBLIC_DAV_USER=${{ secrets.DAV_USER }}
+            EXPO_PUBLIC_DAV_PASS=${{ secrets.DAV_PASS }}

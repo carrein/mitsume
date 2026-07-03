@@ -1,0 +1,11 @@
+# In-container static server for the exported web app (expo-router output:static).
+# Reverse-proxying to Radicale is the HOST Caddy's job (see docs/Deploy.md) — this
+# container only serves files, so it stays credential-free and trivially cacheable.
+:80 {
+	root * /srv
+	encode gzip
+	# Per-route static HTML first (expo-router emits one .html per route), then the
+	# client-side fallback for any route rendered after hydration.
+	try_files {path} {path}.html /index.html
+	file_server
+}

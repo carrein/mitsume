@@ -1,0 +1,9 @@
+# Never bake local state or secrets into the image. `.env` matters most: expo
+# export would read it and override the Dockerfile's EXPO_PUBLIC_* build args.
+.env
+.env*.local
+node_modules
+dist
+.expo
+.claude
+.vscode

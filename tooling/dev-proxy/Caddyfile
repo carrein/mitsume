@@ -1,0 +1,34 @@
+# Dev-time same-origin proxy for WEB development.
+#
+# `expo start --web` serves on :8081, which is a different origin than Radicale —
+# the browser would block CalDAV requests (CORS). This proxy puts Metro and Radicale
+# behind ONE local origin, exactly like production:
+#
+#   http://localhost:8080/        → Metro dev server (incl. HMR websocket)
+#   http://localhost:8080/dav/*   → your Radicale (over Tailscale)
+#
+# Usage:
+#   brew install caddy                       # once
+#   RADICALE_ORIGIN=https://catallenya.<tailnet>.ts.net:7000 \
+#     caddy run --config tooling/dev-proxy/Caddyfile
+#
+# app/.env for web dev:
+#   EXPO_PUBLIC_DAV_URL=http://localhost:8080/dav/
+#
+# (Native Android dev is never subject to CORS — point it straight at the
+# Tailscale URL and skip this proxy.)
+
+:8080 {
+	# Strip /dav before forwarding; X-Script-Name makes Radicale emit hrefs
+	# under /dav so CalDAV discovery resolves through this proxy.
+	handle_path /dav/* {
+		reverse_proxy {$RADICALE_ORIGIN} {
+			header_up X-Script-Name /dav
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	handle {
+		reverse_proxy localhost:8081
+	}
+}
