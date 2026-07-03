@@ -98,6 +98,20 @@ curl -s -o /dev/null -w '%{http_code}\n' -X PROPFIND -H 'Depth: 0' \
 
 Then run the smoke tests in `.claude/plans/caldav-calendar-plan.md` §Smoke tests.
 
+## Android APK (deferred track)
+
+When ready to put it on a phone (needs a free Expo account, nothing installed locally):
+
+```sh
+cd app
+bunx eas-cli login
+bunx eas-cli build --platform android --profile preview   # → downloadable universal .apk
+```
+
+Sideload the APK; `EXPO_PUBLIC_DAV_*` come from `app/.env` at build time (native talks
+straight to the Tailscale Radicale URL — no CORS, no proxy). The GitHub Actions →
+Release → Obtainium pipeline is a follow-up (Requirements §9.11).
+
 ## Local web dev (same-origin without Docker)
 
 Use `tooling/dev-proxy/Caddyfile` (see its header comment):

@@ -1,6 +1,24 @@
 # CalDAV Calendar — Implementation Plan
 Created: 2026-07-01
-Status: IN PROGRESS (awaiting approval)
+Status: COMPLETE (build + static verification) — live smoke tests pending (needs `app/.env` credentials)
+
+## Summary (2026-07-04)
+
+**Built on `feat/caldav-calendar`** (reversible; revert = don't merge): CalDAV data
+layer (tsdav + ical.js with property-preserving edits), month-view UI with full event
+CRUD + delete-undo + 412 handling on Android and web, dev same-origin proxy, web
+Docker image (bun → caddy static), GHCR workflow for Watchtower CD, EAS APK profiles,
+and docs/Deploy.md with the compose + host-Caddy snippets. ~36 files, +2.5k lines.
+
+**Verified:** typecheck, strict lint, prettier, 18 unit tests (incl. the Apple
+property-preservation fixture), clean Metro bundle on web, and a real
+`expo export --platform web` whose dist/ structure matches the container Caddyfile.
+
+**Not yet verified (needs user):** live tsdav round-trip against Radicale (Android +
+web) — blocked on `app/.env` credentials; Docker image build (no Docker on this
+machine); the actual server deploy; EAS Android build. See §Smoke tests.
+
+**Key decisions during build:** see §Build log & deviations.
 
 Companion docs: `caldav-calendar-research.md` (pinned versions + copy-paste snippets).
 Supersedes the earlier interview note.
@@ -136,6 +154,36 @@ Precondition: put your real Radicale `/dav` URL + app password in `app/.env`.
 
 **CROSS-DEVICE:**
 8. Add on web → appears on Android after refresh **and** in Etar/Apple → confirms Radicale is the shared source of truth.
+
+## Build log & deviations (2026-07-04)
+
+All phases A–F implemented on `feat/caldav-calendar` (commits `12f179f` → data layer,
+`4ce6e06` → UI, `19283c8` → deployment; plus prettier style commits). Checks: typecheck,
+strict lint, prettier, and 18 unit tests green (bun runner).
+
+**Deviations from the plan:**
+1. **Phase B live-gate deferred, not skipped** — the tsdav round-trip against real
+   Radicale needs `app/.env` credentials the user provides directly. Unit-level risk
+   (property preservation) is covered by tests; **tsdav-on-Hermes remains open until
+   the Android smoke test runs.** UI was built anyway (data layer is interface-isolated).
+2. **`eas.json` production profile emits an APK** (research example used app-bundle):
+   this app distributes via GitHub Releases → Obtainium (Requirements §9.11), never
+   the Play Store.
+3. **Domain-agnostic web image** (not in original plan): `EXPO_PUBLIC_DAV_URL=/dav/`
+   resolves against `window.location.origin` at runtime (guarded for static export),
+   so one image works on any host.
+4. **In-container Caddy serves static files only**; Radicale proxying lives on the
+   HOST Caddy (one proxy layer, matches the user's compose stack) — the research
+   sketch had the container do both.
+5. **`restoreEvent` + `ConflictError`** added to the data layer (needed by the
+   delete-undo and 412 UX from the interview decisions; not itemized in Phase B).
+6. **Local jest cannot run** (no Node on this machine; jest breaks under bun's
+   runtime). Tests are jest-compatible and run via `bun test` locally; CI (ubuntu,
+   Node preinstalled) runs them under jest as configured.
+7. One documented `react-hooks/set-state-in-effect` suppression in
+   `use-month-events.ts` (online-first fetch-on-mount is the sync with the external
+   system; no store to subscribe to yet).
+8. Tab brand text still says "Expo Starter" (out of scope; will change when notes land).
 
 ## Edge cases & error handling
 - Missing/invalid creds → clear error screen, no crash.
