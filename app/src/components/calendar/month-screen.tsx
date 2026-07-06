@@ -9,7 +9,10 @@ import {
   View,
 } from 'react-native';
 import { Calendar, type DateData } from 'react-native-calendars';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { restoreEvent } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
@@ -19,12 +22,7 @@ import {
 } from '@/components/calendar/event-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import {
-  AccentColor,
-  BottomTabInset,
-  MaxContentWidth,
-  Spacing,
-} from '@/constants/theme';
+import { AccentColor, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,7 +39,13 @@ type Snack = { message: string; undo?: CalEvent } | null;
 export function MonthScreen() {
   const theme = useTheme();
   const scheme = useColorScheme();
+  const insets = useSafeAreaInsets();
   const today = toDateString(new Date());
+
+  const bottomInset = Platform.select({
+    web: Spacing.four,
+    default: insets.bottom + Spacing.three,
+  });
 
   const [visibleMonth, setVisibleMonth] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(today);
@@ -208,7 +212,10 @@ export function MonthScreen() {
             <FlatList
               data={dayEvents}
               keyExtractor={(event) => event.id}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[
+                styles.listContent,
+                { paddingBottom: bottomInset + 72 }, // keep the FAB clear of the last row
+              ]}
               ListEmptyComponent={
                 <ThemedText
                   type="small"
@@ -270,14 +277,21 @@ export function MonthScreen() {
 
       <Pressable
         onPress={() => setEditor({ mode: 'create', day: selectedDay })}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { bottom: bottomInset },
+          pressed && styles.fabPressed,
+        ]}
         accessibilityLabel="Add event"
       >
         <ThemedText style={styles.fabLabel}>＋</ThemedText>
       </Pressable>
 
       {snack && (
-        <View style={styles.snackWrapper} pointerEvents="box-none">
+        <View
+          style={[styles.snackWrapper, { bottom: bottomInset + 68 }]}
+          pointerEvents="box-none"
+        >
           <View style={styles.snack}>
             <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
               {snack.message}
@@ -306,11 +320,6 @@ export function MonthScreen() {
   );
 }
 
-const bottomInset = Platform.select({
-  web: Spacing.four,
-  default: BottomTabInset + Spacing.three,
-});
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -324,7 +333,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.three,
-    paddingTop: Platform.select({ web: Spacing.six, default: Spacing.two }),
+    paddingTop: Platform.select({ web: Spacing.four, default: Spacing.two }),
   },
   setupWrapper: {
     flex: 1,
@@ -362,7 +371,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     gap: Spacing.two,
-    paddingBottom: bottomInset + 72, // keep the FAB clear of the last row
   },
   empty: {
     textAlign: 'center',
@@ -384,7 +392,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: Spacing.four,
-    bottom: bottomInset,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -405,7 +412,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: bottomInset + 68,
     alignItems: 'center',
     paddingHorizontal: Spacing.four,
   },

@@ -61,8 +61,9 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+/** Minimum window width for the side-by-side notes + calendar layout. */
+export const WideLayoutMinWidth = 768;
 
 /** Brand accent (matches the app icon). */
 export const AccentColor = '#E66000';
