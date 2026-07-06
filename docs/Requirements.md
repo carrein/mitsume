@@ -207,6 +207,7 @@ One JS/TS codebase across Android and web. **User-confirmed 2026-06-09.**
 | 6 | Server-side backup | **Periodic y-sweet + MinIO snapshots** (§9.9) |
 | 7 | Encryption revisit | **TLS now; client-side E2E if server leaves trusted net** (§9.10) |
 | 8 | Sketch format | **Vector (point/path JSON)**, optional raster thumb (§9.8) |
+| 9 | Calendar (CalDAV) auth · 2026-07-06 | **Server-side credential injection**: clients (web + Android) store no credentials; the host Caddy injects `Authorization` on `/dav/*` → Radicale. Tailnet reachability = access on that origin (accepted; single-user tailnet — consistent with §9.10 posture). Supersedes the §9.7 token model *for the calendar component only*. |
 
 ## 11. Summary
 

@@ -9,9 +9,14 @@ let clientPromise: Promise<DAVClient> | null = null;
 let calendarPromise: Promise<DAVCalendar> | null = null;
 
 async function connect(): Promise<DAVClient> {
+  // Credential-less by default — the reverse proxy injects Authorization on
+  // /dav/* (verified: tsdav completes the full round-trip with empty
+  // credentials). Username/password attach only when provided (dev fallback
+  // pointing straight at Radicale).
+  const hasCreds = Boolean(DAV.user && DAV.pass);
   const client = new DAVClient({
     serverUrl: DAV.url,
-    credentials: { username: DAV.user, password: DAV.pass },
+    credentials: hasCreds ? { username: DAV.user, password: DAV.pass } : {},
     authMethod: 'Basic',
     defaultAccountType: 'caldav',
   });

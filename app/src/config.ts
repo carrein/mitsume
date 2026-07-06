@@ -1,30 +1,32 @@
 import { Platform } from 'react-native';
 
-// Radicale (CalDAV) connection, read from EXPO_PUBLIC_* env vars (see .env.example).
-// Metro inlines `process.env.EXPO_PUBLIC_*` at build time; access must stay fully
-// dotted (no destructuring / bracket access) or it won't be replaced.
+import { resolveDavUrl } from '@/caldav/resolve-url';
 
-/**
- * The production web image bakes a RELATIVE url (`/dav/`) so one image works on any
- * host (same-origin behind Caddy). Resolve it against the page origin at runtime;
- * guarded because static export renders in Node where `window` doesn't exist.
- */
-function resolveDavUrl(raw: string): string {
-  if (
-    Platform.OS === 'web' &&
-    raw.startsWith('/') &&
-    typeof window !== 'undefined'
-  ) {
-    return new URL(raw, window.location.origin).href;
-  }
-  return raw;
-}
+// Radicale (CalDAV) connection. Credentials are SERVER-SIDE by design: the host
+// Caddy injects Authorization on /dav/* (see docs/Deploy.md), so clients normally
+// run credential-less and only need a URL.
+//
+// EXPO_PUBLIC_* env vars are Metro-inlined at build time; access must stay fully
+// dotted (no destructuring / bracket access) or it won't be replaced.
+//
+// URL precedence: EXPO_PUBLIC_DAV_URL → (web only) `/dav/` on the page's own
+// origin. Native builds must bake a URL (see app/.env.example).
+// Username/password are an OPTIONAL dev fallback (e.g. Android dev straight at
+// Radicale without a proxy) — when absent, requests carry no Authorization.
+
+const rawUrl =
+  process.env.EXPO_PUBLIC_DAV_URL ?? (Platform.OS === 'web' ? '/dav/' : '');
 
 export const DAV = {
-  url: resolveDavUrl(process.env.EXPO_PUBLIC_DAV_URL ?? ''),
+  url: resolveDavUrl(
+    rawUrl,
+    Platform.OS === 'web' && typeof window !== 'undefined'
+      ? window.location.origin
+      : null
+  ),
   user: process.env.EXPO_PUBLIC_DAV_USER ?? '',
   pass: process.env.EXPO_PUBLIC_DAV_PASS ?? '',
 };
 
-/** True only when all three connection vars are present. UI shows a setup hint otherwise. */
-export const davConfigured = Boolean(DAV.url && DAV.user && DAV.pass);
+/** Configured = a server URL exists. Credentials are never required client-side. */
+export const davConfigured = Boolean(DAV.url);

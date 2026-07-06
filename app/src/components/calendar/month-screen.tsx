@@ -123,12 +123,16 @@ export function MonthScreen() {
       <ThemedView style={styles.container}>
         <View style={styles.setupWrapper}>
           <ThemedView type="backgroundElement" style={styles.setupCard}>
-            <ThemedText type="subtitle">Connect your calendar</ThemedText>
+            <ThemedText type="subtitle">
+              No calendar server configured
+            </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Copy <ThemedText type="code">app/.env.example</ThemedText> to{' '}
-              <ThemedText type="code">app/.env</ThemedText> and fill in your
-              Radicale URL, username, and app password. Then restart the dev
-              server (env vars are baked in at build time).
+              This build has no CalDAV server URL. Set{' '}
+              <ThemedText type="code">EXPO_PUBLIC_DAV_URL</ThemedText> when
+              building the app (see{' '}
+              <ThemedText type="code">app/.env.example</ThemedText>) and rebuild
+              — the URL is baked in at build time. Web builds default to{' '}
+              <ThemedText type="code">/dav/</ThemedText> on their own origin.
             </ThemedText>
           </ThemedView>
         </View>

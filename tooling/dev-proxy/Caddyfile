@@ -25,6 +25,9 @@
 		reverse_proxy {$RADICALE_ORIGIN} {
 			header_up X-Script-Name /dav
 			header_up Host {upstream_hostport}
+			# Server-side credential injection (base64 of user:app-password) —
+			# clients send no Authorization; this replaces whatever they send.
+			header_up Authorization "Basic {$RADICALE_BASIC_B64}"
 		}
 	}
 

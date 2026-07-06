@@ -4,9 +4,8 @@ name: Web image
 # main that touches the app. Watchtower on the server polls GHCR and redeploys
 # automatically (see docs/Deploy.md).
 #
-# Optional repo secrets DAV_USER / DAV_PASS bake CalDAV credentials into the
-# bundle (first-cut credential model — keep the GHCR package PRIVATE). Without
-# them the deployed app shows its "Connect your calendar" setup card.
+# CREDENTIAL-FREE: no secrets are used or needed. CalDAV auth is injected
+# server-side by the host Caddy on /dav/* (see docs/Deploy.md).
 
 on:
   push:
@@ -43,5 +42,3 @@ jobs:
             ghcr.io/carrein/mitsume:${{ github.sha }}
           build-args: |
             EXPO_PUBLIC_DAV_URL=/dav/
-            EXPO_PUBLIC_DAV_USER=${{ secrets.DAV_USER }}
-            EXPO_PUBLIC_DAV_PASS=${{ secrets.DAV_PASS }}
