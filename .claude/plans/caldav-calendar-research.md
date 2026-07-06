@@ -1,6 +1,6 @@
 # CalDAV Calendar — Implementation Research (versions + copy‑paste snippets)
 
-> **As‑of: 2026‑07‑01.** Companion to `caldav-calendar.md` (the locked plan). This file pins
+> **As‑of: 2026‑07‑01.** Companion to `caldav-calendar-plan.md` (the locked plan). This file pins
 > exact 2026 versions and gives copy‑pasteable setup/usage for the **first‑cut scope**:
 > online‑first (no cache), month view, list/create/edit/delete on **Android + Web**, single
 > default calendar, credentials from a **gitignored `.env`**, talking to self‑hosted

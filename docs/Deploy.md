@@ -1,7 +1,7 @@
 # Deploy — mitsume web + Radicale (same-origin)
 
-> First-cut deployment for the calendar web app. Android/Obtainium is a separate,
-> deferred track (see `.claude/plans/caldav-calendar-plan.md`).
+> First-cut deployment for the calendar web app. Android/Obtainium is a separate
+> track — see `docs/Release.md`.
 
 ## Shape
 
@@ -101,9 +101,9 @@ URL that resolves against the page origin at runtime).
 - Rotating the password = update Radicale + the `.env` value → restart caddy.
   No image rebuild, no client changes.
 - The Android app points at this same origin (`https://<host>:<port>/dav/`) and is
-  likewise credential-less; only its server URL is baked at APK build time from
-  `app/.env` (never committed — matches the tailnet-name-out-of-public-repos
-  convention; for EAS *cloud* builds use a non-secret EAS env var).
+  likewise credential-less; its server URL is baked at APK build time — in CI from
+  the repo Actions **variable** `MITSUME_DAV_URL` (a variable, not a secret; see
+  `docs/Release.md`), or locally from `app/.env` (never committed).
 - Dev fallback: `EXPO_PUBLIC_DAV_USER`/`_PASS` in `app/.env` make the client attach
   Basic auth itself (e.g. Android dev pointing straight at Radicale). Optional.
 
@@ -124,19 +124,10 @@ wrong site block (it must not).
 
 Then run the smoke tests in `.claude/plans/caldav-calendar-plan.md` §Smoke tests.
 
-## Android APK (deferred track)
+## Android APK
 
-When ready to put it on a phone (needs a free Expo account, nothing installed locally):
-
-```sh
-cd app
-bunx eas-cli login
-bunx eas-cli build --platform android --profile preview   # → downloadable universal .apk
-```
-
-Sideload the APK; `EXPO_PUBLIC_DAV_*` come from `app/.env` at build time (native talks
-straight to the Tailscale Radicale URL — no CORS, no proxy). The GitHub Actions →
-Release → Obtainium pipeline is a follow-up (Requirements §9.11).
+Shipped as its own pipeline: CI builds the APK unsigned, signing + publishing happen
+locally, Obtainium tracks the GitHub Releases feed. Full flow in `docs/Release.md`.
 
 ## Local web dev (same-origin without Docker)
 

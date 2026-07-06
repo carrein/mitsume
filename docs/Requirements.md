@@ -190,9 +190,10 @@ One JS/TS codebase across Android and web. **User-confirmed 2026-06-09.**
   (server stores ciphertext only). Designed-for but not built now.
 
 ### 9.11 Distribution & updates
-- Android: universal release **APK** (Expo EAS, `buildType: apk`, stable signing
-  key) attached to a **GitHub Release**; Obtainium tracks the repo. Use a single
-  universal APK (not per-arch splits) so Obtainium updates don't break.
+- Android: universal release **APK** (CI builds unsigned via `expo prebuild` +
+  Gradle; signed locally with a stable key — see `docs/Release.md`) attached to a
+  **GitHub Release**; Obtainium tracks the repo. Use a single universal APK (not
+  per-arch splits) so Obtainium updates don't break.
 - Web: continuous deploy to the self-hosted environment.
 
 ## 10. Decisions Log (all resolved)
