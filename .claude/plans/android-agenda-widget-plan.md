@@ -1,6 +1,7 @@
 # Android Agenda Widget — Implementation Plan
 Created: 2026-07-07
-Status: IN PROGRESS — Phases A–D approved 2026-07-07; Phase E gated separately
+Status: PHASES A–D COMPLETE (2026-07-07) — on main, CI + web image + APK smoke all
+green. Phase E (release cut v0.2.0 → Obtainium → on-phone verification) awaits go.
 
 ## Context
 
@@ -46,20 +47,20 @@ unit-tested; native behavior is verified on-device after a release cut.
 
 ## Implementation Phases
 
-### Phase A: Dependencies + wiring
-- [ ] `bunx expo install react-native-android-widget expo-file-system` (pin RNAW ≥0.20.3;
-      commit `bun.lock`)
-- [ ] `app.json`: add `['react-native-android-widget', { widgets: [{ name: 'Agenda',
-      label: 'mitsume agenda', description: 'Next 10 events', minWidth: '250dp',
-      minHeight: '110dp', targetCellWidth: 4, targetCellHeight: 2,
-      updatePeriodMillis: 1800000 }] }]` — add resize/preview fields only if the
-      `WithAndroidWidgetsParams` type supports them
-- [ ] New `app/index.ts` entry: `@/polyfills` first, then `expo-router/entry`, then
-      Android-guarded lazy `require` + `registerWidgetTaskHandler`
-- [ ] `app/package.json`: `"main": "index.ts"`
+### Phase A: Dependencies + wiring — DONE
+- [x] `bunx expo install react-native-android-widget expo-file-system` → RNAW 0.20.3,
+      expo-file-system 56.0.8; `bun.lock` committed
+- [x] `app.json`: widget config added; the plugin type DOES support `resizeMode`
+      → `"horizontal|vertical"` (fully resizable)
+- [x] New `app/index.ts` entry: `@/polyfills` → `expo-router/entry` → `@/widget/register`
+- [x] `app/package.json`: `"main": "index.ts"`
+- **Deviation:** no lazy `require` — platform-split modules instead
+  (`register.android.ts` real / `register.ts` no-op), matching the repo's existing
+  `.web.tsx` idiom; web bundle verified widget-free by grepping the export.
 - Files: `app/package.json`, `app/bun.lock`, `app/app.json`, `app/index.ts`
 
-### Phase B: Widget data layer (pure, tested)
+### Phase B: Widget data layer (pure, tested) — DONE (all boxes; plus `format.ts`
+for row labels, and `load.ts` as the shared fetch→cache pipeline)
 - [ ] `app/src/widget/types.ts` — slim `WidgetEvent` (`summary`, `start`/`end` ISO strings,
       `allDay`, `location?`) + `WidgetCache { events: WidgetEvent[]; fetchedAt: string }`
 - [ ] `app/src/widget/select-upcoming.ts` — pure: filter `end > now`, sort by `start`,
@@ -73,7 +74,17 @@ unit-tested; native behavior is verified on-device after a release cut.
 - Files: `app/src/widget/{types,select-upcoming,cache,fetch-upcoming}.ts`,
   `app/src/widget/select-upcoming.test.ts`
 
-### Phase C: Widget UI + task handler
+### Phase C: Widget UI + task handler — DONE, with deviations:
+- **Tap = `OPEN_APP`, not `OPEN_URI app://calendar`** — the calendar moved to the
+  home route in the (previously uncommitted) home-screen refactor; `/calendar` is
+  now a redirect, so a deep link adds nothing. `OPEN_APP` also sits on each list
+  row (root clickAction may not cover ListWidget item areas).
+- **Refresh-on-open lives in `_layout.tsx`** (root layout mount), not the calendar
+  screen — fires once per app launch via platform-split `app-refresh` modules.
+- **Polyfills load in `index.ts`**, the bundle entry — strictly earlier than the
+  task-handler module, so no import there.
+- Component file is `agenda.tsx` exporting `renderAgenda` (light/dark pair —
+  RNAW's `WidgetRepresentation` supports `{ light, dark }` natively).
 - [ ] `app/src/widget/agenda-widget.tsx` — root `FlexWidget` with `clickAction: 'OPEN_URI'`
       → `app://calendar`; header row: "updated HH:mm" (from `toTimeString`) + refresh glyph
       with `clickAction: 'REFRESH'`; `ListWidget` of compact rows (day + time via existing
@@ -88,15 +99,14 @@ unit-tested; native behavior is verified on-device after a release cut.
 - Files: `app/src/widget/{agenda-widget,task-handler}.tsx`, small touch in
   `app/src/app/calendar.tsx` (or `use-month-events.ts`)
 
-### Phase D: Checks + land on main
-- [ ] `bun run typecheck` · `bun run lint -- --max-warnings 0` · `bun run format:check` ·
-      `bun test` on the new pure modules
-- [ ] `bunx expo export --platform web` — prove the entry-point change didn't break the web
-      bundle (the web Docker image runs this exact export)
-- [ ] Commit to `main` + push → CI (typecheck/lint/test) + web image redeploy
-- [ ] Smoke the APK build without releasing: `gh workflow run 'Android APK'` and watch it
-      green — this is where "RNAW on RN 0.85" actually gets proven (risk #1)
-- Files: commit only
+### Phase D: Checks + land on main — DONE
+- [x] typecheck · strict lint · prettier · 29 pure tests green (`bun test src`)
+- [x] `bunx expo export --platform web` clean; web bundle contains zero widget code
+- [x] Pushed as 3 commits (`201ee4e` home refactor, `ac79d70` widget, `ea40e50` docs)
+- [x] `gh workflow run 'Android APK'` triggered (run 28815520295) — RNAW-on-RN-0.85
+      proof pending
+- **Deviation:** the tree also carried the user's uncommitted home-screen refactor;
+  user chose "push everything", so it landed as its own commit under the widget.
 
 ### Phase E: Release cut + on-phone verification (separate go/no-go)
 - [ ] Bump `app.json`: `expo.version` → `0.2.0`, `android.versionCode` → 2; push
@@ -117,10 +127,22 @@ unit-tested; native behavior is verified on-device after a release cut.
 - Corrupt/missing cache file → treated as empty, overwritten on next success.
 - ListWidget row height must stay ≤ widget height → single-line compact rows.
 
+## Summary (2026-07-07, phases A–D)
+
+Landed on main as `ac79d70` (widget) on top of `201ee4e` (the user's home-screen
+refactor, pushed together by user choice) and `ea40e50` (docs). New module
+`app/src/widget/` (10 files + 2 tests): pure selector + formatter, expo-file-system
+last-good cache, shared fetch→cache pipeline, light/dark JSX tree, headless task
+handler; entry moved to `app/index.ts`; refresh-on-open in `_layout.tsx`;
+platform-split keeps web/iOS widget-free (verified in the export). Checks: typecheck,
+strict lint, prettier, 29 pure tests, clean web export, CI + Web image + a
+17-min cold APK smoke build all green. Key deviations recorded per phase above
+(OPEN_APP over deep link, platform-split over lazy require, polyfills at entry).
+
 ## Risks & Open Questions
-- **RNAW on RN 0.85/SDK 56 is maintainer-untested** (declared through RN 0.83). Proven or
-  broken at Phase D's CI APK smoke. Fallback: try latest RNAW master / pin experiments;
-  last resort a native Glance module (out of scope unless needed).
+- ~~**RNAW on RN 0.85/SDK 56 is maintainer-untested**~~ **RESOLVED at build level**
+  (2026-07-07): APK smoke run 28815520295 green. Runtime behavior (headless handler,
+  ListWidget rendering, dark mode) still needs the on-phone pass in Phase E.
 - **Headless timeout unverified** — cold fetch is ~6 round-trips; if updates silently miss,
   suspect the native task timeout first. Cache limits blast radius to staleness.
 - `resizeMode`/preview not confirmed as Expo-plugin fields — inspect the package's TS types
