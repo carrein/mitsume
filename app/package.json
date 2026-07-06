@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~56.0.17",
@@ -8,7 +8,7 @@
     "expo": "~56.0.11",
     "expo-constants": "~56.0.18",
     "expo-crypto": "~56.0.4",
-    "expo-device": "~56.0.4",
+    "expo-file-system": "~56.0.8",
     "expo-font": "~56.0.6",
     "expo-glass-effect": "~56.0.4",
     "expo-image": "~56.0.11",
@@ -24,6 +24,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-android-widget": "^0.20.3",
     "react-native-calendars": "^1.1314.0",
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "4.3.1",
