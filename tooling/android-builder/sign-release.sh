@@ -30,8 +30,11 @@ docker run --rm -v "$PWD/dist-apk:/w" -v "$KEYS_DIR:/keys:ro" -w /w eclipse-temu
     --out "mitsume-$TAG.apk" "mitsume-$TAG-unsigned.apk"
 
 echo "==> verify signature + content audit"
+# Capture instead of piping to head: SIGPIPE from an early-exiting reader would
+# abort the script under pipefail AFTER verify but BEFORE publish.
 docker run --rm -v "$PWD/dist-apk:/w" -w /w eclipse-temurin:17-jre \
-  java -jar apksigner.jar verify --print-certs "mitsume-$TAG.apk" | head -3
+  java -jar apksigner.jar verify --print-certs "mitsume-$TAG.apk" > dist-apk/verify.txt
+head -3 dist-apk/verify.txt
 grep -ca 'ts.net' "dist-apk/mitsume-$TAG.apk" >/dev/null \
   && echo "baked URL present ✓" || { echo "FAIL: baked URL missing"; exit 1; }
 
