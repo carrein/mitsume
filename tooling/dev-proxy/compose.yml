@@ -1,0 +1,17 @@
+# Local same-origin dev proxy (see Caddyfile header for usage). Official caddy
+# image, no volumes/state — `down` + `docker rmi caddy:2-alpine` reverts fully.
+services:
+  dev-proxy:
+    container_name: mitsume-dev-proxy
+    image: caddy:2-alpine
+    ports:
+      - '8880:8880'
+    environment:
+      # From tooling/dev-proxy/.env (gitignored; see .env.example).
+      RADICALE_ORIGIN: ${RADICALE_ORIGIN:?set RADICALE_ORIGIN in tooling/dev-proxy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      # Lets the container reach the Mac (Metro on :8081); works on colima and
+      # Docker Desktop alike.
+      - host.docker.internal:host-gateway

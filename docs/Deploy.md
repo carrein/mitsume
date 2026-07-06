@@ -115,4 +115,4 @@ Release → Obtainium pipeline is a follow-up (Requirements §9.11).
 ## Local web dev (same-origin without Docker)
 
 Use `tooling/dev-proxy/Caddyfile` (see its header comment):
-Metro on `:8081` + Radicale under `http://localhost:8080/dav/`.
+Metro on `:8081` + Radicale under `http://localhost:8880/dav/`.

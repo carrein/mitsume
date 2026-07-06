@@ -6,3 +6,6 @@
 
 # Node / Expo (app-level ignores live in app/.gitignore)
 node_modules/
+
+# Local env files
+tooling/dev-proxy/.env

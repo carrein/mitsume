@@ -14,9 +14,14 @@ and docs/Deploy.md with the compose + host-Caddy snippets. ~36 files, +2.5k line
 property-preservation fixture), clean Metro bundle on web, and a real
 `expo export --platform web` whose dist/ structure matches the container Caddyfile.
 
-**Not yet verified (needs user):** live tsdav round-trip against Radicale (Android +
-web) — blocked on `app/.env` credentials; Docker image build (no Docker on this
-machine); the actual server deploy; EAS Android build. See §Smoke tests.
+**Live gate: PASSED (2026-07-04).** With real `app/.env` credentials, the full
+round-trip ran against the production Radicale using the app's own ics layer + tsdav
+(bun runtime): login/discovery → fetchCalendars (1: "carrein-calendar") → time-range
+fetch + expand (12 events) → create → etag-guarded update → delete → verified gone.
+
+**Not yet verified (needs user/device):** Hermes runtime on Android (polyfills wired,
+unexercised — EAS build); in-browser UI smoke tests; Docker image build (no Docker on
+this machine); the actual server deploy. See §Smoke tests.
 
 **Key decisions during build:** see §Build log & deviations.
 
@@ -184,6 +189,12 @@ strict lint, prettier, and 18 unit tests green (bun runner).
    `use-month-events.ts` (online-first fetch-on-mount is the sync with the external
    system; no store to subscribe to yet).
 8. Tab brand text still says "Expo Starter" (out of scope; will change when notes land).
+9. **Dev proxy is dockerized** (2026-07-06, user preference — no host installs): official
+   `caddy:2-alpine` via `tooling/dev-proxy/compose.yml`; Docker runtime on this Mac is
+   **colima** (brew: colima/docker/docker-compose; removal documented in chat). Proxy
+   listens on **:8880**, not :8080 — the user's eleventy blog dev server owns 8080.
+   Verified end-to-end: Metro + `/dav/` 401 unauth / 207 authed with hrefs rewritten
+   under `/dav/` by X-Script-Name.
 
 ## Edge cases & error handling
 - Missing/invalid creds → clear error screen, no crash.
