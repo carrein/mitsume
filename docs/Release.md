@@ -1,0 +1,62 @@
+# Release — Android APK → GitHub Releases → Obtainium
+
+> Web deploys continuously (merge to `main` → CI image → Watchtower). This doc is the
+> **Android** channel: a signed universal APK attached to a GitHub Release, tracked by
+> [Obtainium](https://github.com/ImranR98/Obtainium) on the phone.
+
+## Architecture (locked 2026-07-06)
+
+- **CI builds, local signs** (hybrid): GitHub Actions (`.github/workflows/android-apk.yml`)
+  builds the APK **unsigned** on real x86_64 Linux — the canonical platform — and
+  uploads it as an artifact together with `apksigner.jar`. Signing + publishing happen
+  locally via `tooling/android-builder/sign-release.sh`. **GitHub holds no secrets;
+  the signing keystore never leaves the maintainer's machine.**
+  (Memoka precedent signed in CI via `KEYSTORE_BASE64` secret; mitsume deliberately
+  keeps key custody local.)
+- **Baked server URL** ("option 1"): the APK ships `EXPO_PUBLIC_DAV_URL` baked from
+  the repo Actions **variable** `MITSUME_DAV_URL` — a variable, not a secret: the
+  ts.net hostname is already public via Certificate Transparency, and the origin is
+  unreachable off-tailnet (server-verified; Funnel off). URL/port change ⇒ new release.
+- **Signing keystore**: `~/.mitsume-keys/` (`release.keystore` + `keystore.properties`),
+  NEVER in git. ⚠️ **Back it up** — Android only installs updates signed by the same
+  key; losing it means uninstall/reinstall + Obtainium re-add.
+- APKs contain **no credentials** (server-side injection — `docs/Deploy.md`).
+
+## Cutting a release
+
+1. Bump **both** in `app/app.json`: `expo.version` (e.g. `0.2.0`) and
+   `expo.android.versionCode` (+1 — Android refuses same-code updates).
+2. Commit + push `main` (web redeploys too — versions stay in lockstep).
+3. Build in CI — either push a tag (`git tag v0.2.0 && git push origin v0.2.0`) or:
+   ```sh
+   gh workflow run 'Android APK'
+   ```
+   Wait for the run to go green (`gh run watch`).
+4. Sign + publish locally:
+   ```sh
+   ./tooling/android-builder/sign-release.sh
+   ```
+   (Downloads the artifact, signs with `~/.mitsume-keys` in a small JRE container,
+   verifies the signature + baked URL, creates the GitHub Release with the APK.)
+5. Obtainium picks it up on its next poll.
+
+## Phone setup (one-time)
+
+Install Obtainium (F-Droid) → **Add App** → source URL `https://github.com/carrein/mitsume`
+→ install. Updates arrive as notifications thereafter.
+
+## Fallback: fully local Docker build (no GitHub)
+
+`./tooling/android-builder/build.sh` builds AND signs entirely on this machine
+(derived multiarch image: x86 Android tools under Rosetta + native arm64 Node; Maven
+mirror for Sonatype IP blocks; needs colima ≥10 GB). Status: debugged through all
+known failure layers but not yet proven end-to-end — prefer the CI path.
+
+## Notes
+
+- One-time repo setup already done: Actions variable `MITSUME_DAV_URL`; keystore
+  generated 2026-07-06.
+- `dist-apk/`, `app/android/`, and the builder `.env` are gitignored/disposable.
+- Revisit triggers for the baked-URL decision: Funnel ever enabled, tailnet gains
+  users, or URL churn (→ switch to first-run URL entry; design shelved in
+  `.claude/plans/settings-page-plan.md`).

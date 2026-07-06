@@ -1,0 +1,19 @@
+// Repository mirror for networks where Sonatype's Maven Central / the Gradle
+// plugin portal 403 (IP-reputation blocks). Google's GCS mirror of Maven Central
+// serves identical artifacts. Injected FIRST via beforeSettings so it covers
+// settings-plugin resolution (com.facebook.react.settings), which happens before
+// settingsEvaluated would fire. Installed by container-build.sh into ~/.gradle/init.d/.
+def central = 'https://maven-central.storage-download.googleapis.com/maven2/'
+
+beforeSettings { settings ->
+    settings.pluginManagement.repositories {
+        maven { url central }
+    }
+}
+
+allprojects {
+    buildscript {
+        repositories { maven { url central } }
+    }
+    repositories { maven { url central } }
+}

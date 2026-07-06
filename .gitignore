@@ -9,3 +9,7 @@ node_modules/
 
 # Local env files
 tooling/dev-proxy/.env
+tooling/android-builder/.env
+
+# Built APKs (attached to GitHub Releases, not committed)
+dist-apk/

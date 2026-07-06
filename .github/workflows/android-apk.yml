@@ -1,0 +1,67 @@
+name: Android APK
+
+# Builds the release APK UNSIGNED on real x86_64 Linux and uploads it as an
+# artifact (plus apksigner.jar from the runner's build-tools). Signing happens
+# LOCALLY via tooling/android-builder/sign-release.sh — the keystore never
+# leaves the maintainer's machine and this repo holds no secrets.
+#
+# The baked server URL comes from the repo Actions VARIABLE `MITSUME_DAV_URL`
+# (a variable, not a secret — the URL is public-by-decision; see docs/Release.md).
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Prebuild android project
+        working-directory: app
+        run: bunx expo prebuild --platform android --no-install
+
+      - name: Strip signing (signed locally after download)
+        run: node tooling/android-builder/patch-signing.mjs app/android/app/build.gradle --unsigned
+
+      - name: Build release APK (unsigned, universal)
+        working-directory: app/android
+        env:
+          EXPO_PUBLIC_DAV_URL: ${{ vars.MITSUME_DAV_URL }}
+        run: ./gradlew :app:assembleRelease
+
+      - name: Zipalign + stage signing tool
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          VERSION=$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("app/app.json","utf8")).expo.version)')
+          "$BT/zipalign" -f 4 \
+            app/android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            "mitsume-v$VERSION-unsigned.apk"
+          cp "$BT/lib/apksigner.jar" .
+          echo "built mitsume-v$VERSION-unsigned.apk (aligned)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mitsume-unsigned-apk
+          path: |
+            mitsume-v*-unsigned.apk
+            apksigner.jar
+          if-no-files-found: error
+          retention-days: 30
