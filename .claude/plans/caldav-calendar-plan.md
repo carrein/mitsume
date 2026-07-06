@@ -1,6 +1,9 @@
 # CalDAV Calendar — Implementation Plan
 Created: 2026-07-01
-Status: COMPLETE (build + static verification) — live smoke tests pending (needs `app/.env` credentials)
+Status: SHIPPED (2026-07-06) — web live at the tailnet origin (CI → GHCR → Watchtower);
+Android v0.1.0 on GitHub Releases via Obtainium (CI builds unsigned → local sign,
+docs/Release.md); credentials server-side only (docs/Deploy.md). User-confirmed on
+both platforms. Next: feature development (deferred list below).
 
 ## Summary (2026-07-04)
 
