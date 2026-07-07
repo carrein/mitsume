@@ -16,7 +16,12 @@ MinIO planned for notes). Targets web + Android (Obtainium) — no iOS.
 
 ## Dev loop (bun only — no Node on this machine)
 
-- Always `cd app/` first, then `bun run --bun web`.
+- Always `cd app/` first, then `bun run --bun web:proxy` (forces the
+  same-origin `/dav/` URL; plain `web` bakes the tailnet URL from `app/.env`
+  into the bundle and CORS-breaks behind the proxy).
+- Web e2e: `tooling/e2e/run.sh` — dockerized Playwright + a throwaway Radicale
+  behind its own Caddy on :8881 (never touches the real calendar). Needs Metro
+  running (`web:proxy`).
 - Android hot reload: `bun run android:dev` (debug build under
   `com.carrein.mitsume.dev`, coexists with the release app; needs the local
   Android SDK — installed 2026-07-07 via Android Studio, env in `~/.zshrc`).

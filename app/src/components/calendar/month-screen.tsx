@@ -1,5 +1,5 @@
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -36,6 +36,23 @@ type EditorState =
   | { mode: 'edit'; event: CalEvent };
 
 type Snack = { message: string; undo?: CalEvent } | null;
+
+/** One agenda entry: a day (dateString) and its events, sorted for display. */
+type AgendaSection = { day: string; events: CalEvent[] };
+
+function compareEvents(a: CalEvent, b: CalEvent): number {
+  if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+  return a.start.getTime() - b.start.getTime();
+}
+
+function agendaDayLabel(day: string, today: string): string {
+  const label = (parseDay(day) ?? new Date()).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  return day === today ? `${label} · Today` : label;
+}
 
 export function MonthScreen() {
   const theme = useTheme();
@@ -85,21 +102,50 @@ export function MonthScreen() {
     return marks;
   }, [events, selectedDay]);
 
-  const dayEvents = useMemo(
-    () =>
-      events
-        .filter((event) =>
-          eventDays(event.start, event.end).includes(selectedDay)
-        )
-        .sort((a, b) =>
-          a.allDay !== b.allDay
-            ? a.allDay
-              ? -1
-              : 1
-            : a.start.getTime() - b.start.getTime()
-        ),
-    [events, selectedDay]
+  // Agenda scope: the visible month only. The fetch window includes ±7d of
+  // grid overflow, so filter by month prefix rather than showing everything.
+  const monthPrefix = toDateString(visibleMonth).slice(0, 7);
+
+  const sections = useMemo<AgendaSection[]>(() => {
+    const byDay = new Map<string, CalEvent[]>();
+    for (const event of events) {
+      for (const day of eventDays(event.start, event.end)) {
+        if (!day.startsWith(monthPrefix)) continue;
+        const list = byDay.get(day);
+        if (list) list.push(event);
+        else byDay.set(day, [event]);
+      }
+    }
+    return [...byDay.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([day, dayEvents]) => ({
+        day,
+        events: dayEvents.sort(compareEvents),
+      }));
+  }, [events, monthPrefix]);
+
+  const listRef = useRef<FlatList<AgendaSection>>(null);
+
+  const scrollToDay = useCallback(
+    (day: string, animated = true) => {
+      if (sections.length === 0) return;
+      // The tapped day may have no events — land on the nearest day after it.
+      const index = sections.findIndex((section) => section.day >= day);
+      if (index === -1) listRef.current?.scrollToEnd({ animated });
+      else listRef.current?.scrollToIndex({ index, animated, viewPosition: 0 });
+    },
+    [sections]
   );
+
+  // Once per month: start the agenda at today (current month) or at the top.
+  const autoScrolledMonth = useRef<string | null>(null);
+  useEffect(() => {
+    if (sections.length === 0) return;
+    if (autoScrolledMonth.current === monthPrefix) return;
+    autoScrolledMonth.current = monthPrefix;
+    if (today.startsWith(monthPrefix)) scrollToDay(today, false);
+    else listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [sections, monthPrefix, today, scrollToDay]);
 
   function onEditorDone(result: EditorResult) {
     setEditor({ mode: 'closed' });
@@ -150,12 +196,10 @@ export function MonthScreen() {
     );
   }
 
-  const selectedDayLabel =
-    (parseDay(selectedDay) ?? new Date()).toLocaleDateString(undefined, {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-    }) + (selectedDay === today ? ' · Today' : '');
+  const monthLabel = visibleMonth.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <ThemedView style={styles.container}>
@@ -163,10 +207,14 @@ export function MonthScreen() {
         <View style={styles.content}>
           <Calendar
             key={scheme} // react-native-calendars caches theme; remount on scheme change
+            testID="month-calendar" // e2e: day cells/arrows derive ids from this
             current={toDateString(visibleMonth)}
             firstDay={1}
             enableSwipeMonths
-            onDayPress={(day: DateData) => setSelectedDay(day.dateString)}
+            onDayPress={(day: DateData) => {
+              setSelectedDay(day.dateString);
+              scrollToDay(day.dateString);
+            }}
             onMonthChange={(month: DateData) =>
               setVisibleMonth(new Date(month.year, month.month - 1, 1))
             }
@@ -198,7 +246,9 @@ export function MonthScreen() {
           )}
 
           <View style={styles.dayHeader}>
-            <ThemedText type="smallBold">{selectedDayLabel}</ThemedText>
+            <ThemedText type="smallBold" testID="agenda-month-label">
+              {monthLabel}
+            </ThemedText>
             <Pressable onPress={refresh} hitSlop={8}>
               <SymbolView
                 name={{
@@ -216,65 +266,97 @@ export function MonthScreen() {
             <ActivityIndicator color={AccentColor} style={styles.spinner} />
           ) : (
             <FlatList
-              data={dayEvents}
-              keyExtractor={(event) => event.id}
+              ref={listRef}
+              testID="agenda-list"
+              data={sections}
+              keyExtractor={(section) => section.day}
               contentContainerStyle={[
                 styles.listContent,
                 { paddingBottom: bottomInset + 72 }, // keep the FAB clear of the last row
               ]}
+              onScrollToIndexFailed={({ index, averageItemLength }) => {
+                // Target not rendered yet — jump near it, then settle exactly.
+                listRef.current?.scrollToOffset({
+                  offset: index * averageItemLength,
+                  animated: false,
+                });
+                setTimeout(() => {
+                  listRef.current?.scrollToIndex({ index, animated: true });
+                }, 80);
+              }}
               ListEmptyComponent={
                 <ThemedText
                   type="small"
                   themeColor="textSecondary"
                   style={styles.empty}
                 >
-                  No events
+                  No events this month
                 </ThemedText>
               }
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => setEditor({ mode: 'edit', event: item })}
-                >
-                  {({ pressed }) => (
-                    <ThemedView
-                      type={
-                        pressed ? 'backgroundSelected' : 'backgroundElement'
-                      }
-                      style={styles.eventRow}
+              renderItem={({ item: section }) => (
+                <View style={styles.daySection}>
+                  <ThemedText
+                    type="smallBold"
+                    themeColor={
+                      section.day === selectedDay ? undefined : 'textSecondary'
+                    }
+                    style={styles.dayLabel}
+                  >
+                    {agendaDayLabel(section.day, today)}
+                  </ThemedText>
+                  {section.events.map((event) => (
+                    <Pressable
+                      key={event.id}
+                      onPress={() => setEditor({ mode: 'edit', event })}
                     >
-                      <View style={styles.eventTime}>
-                        {item.allDay ? (
-                          <ThemedText type="small" themeColor="textSecondary">
-                            All day
-                          </ThemedText>
-                        ) : (
-                          <>
-                            <ThemedText type="small">
-                              {toTimeString(item.start)}
+                      {({ pressed }) => (
+                        <ThemedView
+                          type={
+                            pressed ? 'backgroundSelected' : 'backgroundElement'
+                          }
+                          style={styles.eventRow}
+                        >
+                          <View style={styles.eventTime}>
+                            {event.allDay ? (
+                              <ThemedText
+                                type="small"
+                                themeColor="textSecondary"
+                              >
+                                All day
+                              </ThemedText>
+                            ) : (
+                              <>
+                                <ThemedText type="small">
+                                  {toTimeString(event.start)}
+                                </ThemedText>
+                                <ThemedText
+                                  type="small"
+                                  themeColor="textSecondary"
+                                >
+                                  {toTimeString(event.end)}
+                                </ThemedText>
+                              </>
+                            )}
+                          </View>
+                          <View style={styles.eventBody}>
+                            <ThemedText numberOfLines={1}>
+                              {event.summary || '(untitled)'}
                             </ThemedText>
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {toTimeString(item.end)}
-                            </ThemedText>
-                          </>
-                        )}
-                      </View>
-                      <View style={styles.eventBody}>
-                        <ThemedText numberOfLines={1}>
-                          {item.summary || '(untitled)'}
-                        </ThemedText>
-                        {item.location ? (
-                          <ThemedText
-                            type="small"
-                            themeColor="textSecondary"
-                            numberOfLines={1}
-                          >
-                            {item.location}
-                          </ThemedText>
-                        ) : null}
-                      </View>
-                    </ThemedView>
-                  )}
-                </Pressable>
+                            {event.location ? (
+                              <ThemedText
+                                type="small"
+                                themeColor="textSecondary"
+                                numberOfLines={1}
+                              >
+                                {event.location}
+                              </ThemedText>
+                            ) : null}
+                          </View>
+                        </ThemedView>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               )}
             />
           )}
@@ -376,7 +458,13 @@ const styles = StyleSheet.create({
     marginTop: Spacing.five,
   },
   listContent: {
+    gap: Spacing.three,
+  },
+  daySection: {
     gap: Spacing.two,
+  },
+  dayLabel: {
+    paddingHorizontal: Spacing.one,
   },
   empty: {
     textAlign: 'center',
