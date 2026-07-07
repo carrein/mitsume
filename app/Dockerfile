@@ -21,6 +21,8 @@ ARG EXPO_PUBLIC_DAV_URL=/dav/
 ENV EXPO_PUBLIC_DAV_URL=$EXPO_PUBLIC_DAV_URL \
     CI=1
 RUN bunx expo export --platform web
+# Version stamp for the web app's silent-reload check (use-silent-reload.web.ts)
+RUN bun --eval 'require("fs").writeFileSync("dist/version.json", JSON.stringify({ version: require("./app.json").expo.version }))'
 
 # ---- serve ----
 FROM caddy:2-alpine

@@ -5,10 +5,12 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { VersionBadge } from '@/components/version-badge';
+import { useSilentReload } from '@/hooks/use-silent-reload';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  useSilentReload();
   useEffect(() => {
     // DEFERRED on purpose — do not fire this during boot. The widget render
     // allocates large transient bitmaps (full widget + every row, ×2 for
