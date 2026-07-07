@@ -1,3 +1,7 @@
+// react-native-android-widget calls these components as raw functions (no React
+// renderer), so the React Compiler's memo-cache hooks crash them at runtime.
+'use no memo';
+
 // JSX tree for the Android home-screen agenda — react-native-android-widget
 // primitives (not RN views), rendered headlessly by the task handler. The
 // light/dark pair lets the launcher pick the palette that matches the system.
