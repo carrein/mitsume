@@ -12,6 +12,8 @@
 FROM oven/bun:1 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
+# patchedDependencies (bun patch) must be present at install time
+COPY patches ./patches
 RUN bun install --frozen-lockfile
 COPY . .
 
