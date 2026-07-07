@@ -51,6 +51,22 @@
 for untagged smoke builds — they publish nothing user-facing on their own
 (Watchtower does follow `:latest`, so dispatching Web image deploys; prefer tags).
 
+## Web-only releases (fast lane)
+
+For web-only iteration, skip the APK cost: bump `expo.version` to a suffixed
+patch on the current release (e.g. `0.2.6` → `0.2.6-web.1`; leave `versionCode`
+alone), commit, then:
+
+```sh
+git tag v0.2.6-web.1 && git push origin main v0.2.6-web.1
+```
+
+The `-web` suffix makes the Android workflow skip itself; only the web image
+builds and deploys. The version badge makes the divergence visible (web
+`0.2.6-web.1`, phone `0.2.6`) — deliberate, not drift. The next full release
+(e.g. `v0.2.7`) re-syncs both channels. Never run `sign-release.sh` for a
+web-only cut.
+
 ## Phone setup (one-time)
 
 Install Obtainium (F-Droid) → **Add App** → source URL `https://github.com/carrein/mitsume`
