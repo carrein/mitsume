@@ -8,7 +8,7 @@ import { monthFetchRange } from '@/utils/date';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 /** Poll cadence while the view is actually visible (zero network when hidden). */
-const POLL_VISIBLE_MS = 3 * 60_000;
+const POLL_VISIBLE_MS = 60_000;
 
 /**
  * Online-first month window: fetches events for the visible month (± grid overflow)
