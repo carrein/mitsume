@@ -71,10 +71,18 @@ export function useMonthEvents(visibleMonth: Date) {
       interval = setInterval(refresh, POLL_VISIBLE_MS);
     };
 
+    let lastRevalidate = 0;
+    const revalidate = () => {
+      // Focus + visibility can fire together on one return — refetch once.
+      if (Date.now() - lastRevalidate < 5_000) return;
+      lastRevalidate = Date.now();
+      refresh();
+      refreshAgendaWidget(); // foreground = the reliable widget trigger (no-op off-Android)
+    };
+
     const onAppStateChange = (state: AppStateStatus) => {
       if (state === 'active') {
-        refresh();
-        refreshAgendaWidget(); // foreground = the reliable widget trigger (no-op off-Android)
+        revalidate();
         startPolling();
       } else {
         stopPolling();
@@ -83,9 +91,18 @@ export function useMonthEvents(visibleMonth: Date) {
 
     startPolling(); // mounted views start visible; the initial fetch is the effect above
     const subscription = AppState.addEventListener('change', onAppStateChange);
+    // macOS Spaces/desktop switches never mark the tab hidden (no visibility
+    // event) but do blur/focus the window — revalidate on focus too.
+    const onWindowFocus = () => revalidate();
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      window.addEventListener('focus', onWindowFocus);
+    }
     return () => {
       stopPolling();
       subscription.remove();
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        window.removeEventListener('focus', onWindowFocus);
+      }
     };
   }, [refresh]);
 

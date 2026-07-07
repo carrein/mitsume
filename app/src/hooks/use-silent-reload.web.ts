@@ -15,14 +15,17 @@ export function useSilentReload(): void {
 
     let stale = false;
     const reloadIfSafe = () => {
-      if (stale && document.hidden) window.location.reload();
+      // Hidden tab, or a just-refocused one the user hasn't touched yet
+      // (macOS Space switches never mark the tab hidden — blur/focus is the
+      // only signal there). A stale half-typed form is the accepted cost.
+      if (stale) window.location.reload();
     };
     const check = async () => {
       try {
         const res = await fetch('/version.json', { cache: 'no-store' });
         const { version } = (await res.json()) as { version?: string };
         stale = Boolean(version) && version !== current;
-        reloadIfSafe();
+        if (stale && document.hidden) window.location.reload();
       } catch {
         // Dev server / offline: no version.json — nothing to do.
       }
@@ -30,16 +33,23 @@ export function useSilentReload(): void {
 
     const onVisibilityChange = () => {
       if (document.hidden) {
-        reloadIfSafe(); // known-stale: swap immediately on hide
-        check(); // otherwise look for one while hidden
+        if (stale)
+          window.location.reload(); // known-stale: swap on hide
+        else check(); // otherwise look for one while hidden
       }
     };
+    const onBlur = () => check(); // Space switch away: detect staleness
+    const onFocus = () => reloadIfSafe(); // Space switch back: swap before use
 
     const interval = setInterval(check, CHECK_INTERVAL_MS);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
 }
