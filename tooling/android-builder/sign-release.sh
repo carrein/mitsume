@@ -9,8 +9,9 @@ cd "$(dirname "$0")/../.."
 KEYS_DIR="${MITSUME_KEYS_DIR:-$HOME/.mitsume-keys}"
 [ -f "$KEYS_DIR/release.keystore" ] || { echo "missing $KEYS_DIR/release.keystore"; exit 1; }
 
-VERSION=$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("app/app.json","utf8")).expo.version)')
-TAG="v$VERSION"
+# Tag to sign+publish: explicit arg (e.g. `sign-release.sh v0.2.6`) or derived
+# from app.json — the arg matters when app.json has moved on to a -web patch.
+TAG="${1:-v$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("app/app.json","utf8")).expo.version)')}"
 
 echo "==> fetching latest successful Android APK workflow artifact"
 RUN=$(gh run list --workflow 'Android APK' --status success -L 1 --json databaseId -q '.[0].databaseId')
