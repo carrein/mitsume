@@ -66,6 +66,6 @@ export const MaxContentWidth = 800;
 export const WideLayoutMinWidth = 768;
 
 /** Brand accent (matches the app icon). */
-export const AccentColor = '#E66000';
+export const AccentColor = '#FF9500';
 /** Destructive actions / validation errors. */
 export const DangerColor = '#B3261E';

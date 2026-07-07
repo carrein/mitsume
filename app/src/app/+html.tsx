@@ -20,7 +20,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <meta name="theme-color" content="#E66000" />
+        <meta name="theme-color" content="#FF9500" />
 
         {/*
           Disable body scrolling on web so ScrollView components work as

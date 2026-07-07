@@ -11,7 +11,7 @@
       "package": "com.carrein.mitsume",
       "versionCode": 7,
       "adaptiveIcon": {
-        "backgroundColor": "#E66000",
+        "backgroundColor": "#FF9500",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
