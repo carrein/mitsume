@@ -17,6 +17,9 @@ MinIO planned for notes). Targets web + Android (Obtainium) — no iOS.
 ## Dev loop (bun only — no Node on this machine)
 
 - Always `cd app/` first, then `bun run --bun web`.
+- Android hot reload: `bun run android:dev` (debug build under
+  `com.carrein.mitsume.dev`, coexists with the release app; needs the local
+  Android SDK — installed 2026-07-07 via Android Studio, env in `~/.zshrc`).
 - Browse the dockerized dev proxy at `http://localhost:8880` (injects DAV
   auth), NOT Metro's `:8081` directly (CORS). Start it from
   `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
