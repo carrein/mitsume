@@ -1,8 +1,12 @@
-# Release — Android APK → GitHub Releases → Obtainium
+# Release — one cut ships both channels (web + Android, versions in parity)
 
-> Web deploys continuously (merge to `main` → CI image → Watchtower). This doc is the
-> **Android** channel: a signed universal APK attached to a GitHub Release, tracked by
-> [Obtainium](https://github.com/ImranR98/Obtainium) on the phone.
+> Releases are **symmetric** (decided 2026-07-07): pushes to `main` only run CI
+> checks; a `v*` tag fires BOTH the web image and the Android APK from the same
+> commit, so both platforms always carry the same version (visible in the
+> in-app version badge, bottom-right). Android lands as a signed universal APK
+> on a GitHub Release, tracked by
+> [Obtainium](https://github.com/ImranR98/Obtainium); web lands as
+> `ghcr.io/carrein/mitsume:latest`, deployed by Watchtower.
 
 ## Architecture (locked 2026-07-06)
 
@@ -24,21 +28,28 @@
 
 ## Cutting a release
 
-1. Bump **both** in `app/app.json`: `expo.version` (e.g. `0.2.0`) and
+1. Batch changes on `main` until the set feels release-worthy (CI checks every
+   push; nothing deploys).
+2. Bump **both** in `app/app.json`: `expo.version` (e.g. `0.3.0`) and
    `expo.android.versionCode` (+1 — Android refuses same-code updates).
-2. Commit + push `main` (web redeploys too — versions stay in lockstep).
-3. Build in CI — either push a tag (`git tag v0.2.0 && git push origin v0.2.0`) or:
+3. Commit + push, then tag:
    ```sh
-   gh workflow run 'Android APK'
+   git tag v0.3.0 && git push origin main v0.3.0
    ```
-   Wait for the run to go green (`gh run watch`).
-4. Sign + publish locally:
+   The tag fires **both** workflows (`Android APK` + `Web image`) from the same
+   commit. Wait for green (`gh run watch`).
+4. Sign + publish the Android side locally:
    ```sh
    ./tooling/android-builder/sign-release.sh
    ```
    (Downloads the artifact, signs with `~/.mitsume-keys` in a small JRE container,
    verifies the signature + baked URL, creates the GitHub Release with the APK.)
-5. Obtainium picks it up on its next poll.
+5. Obtainium picks up the APK on its next poll; Watchtower deploys the web image
+   on its next cycle. Verify parity via the version badge on both.
+
+`gh workflow run 'Android APK'` / `'Web image'` (workflow_dispatch) still exist
+for untagged smoke builds — they publish nothing user-facing on their own
+(Watchtower does follow `:latest`, so dispatching Web image deploys; prefer tags).
 
 ## Phone setup (one-time)
 

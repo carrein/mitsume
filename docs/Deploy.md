@@ -24,8 +24,9 @@ Android app ──┘                     ▲                           └  (X-
                       MITSUME_DAV_B64 in server .env
 ```
 
-CD matches the rest of the stack: pushes to `main` build `ghcr.io/carrein/mitsume:latest`
-(`.github/workflows/web-image.yml`) and Watchtower redeploys it.
+CD is release-gated (symmetric with Android — see `docs/Release.md`): a `v*` tag
+builds `ghcr.io/carrein/mitsume:latest` (`.github/workflows/web-image.yml`) and
+Watchtower redeploys it. Pushes to `main` deploy nothing.
 
 ## 1. Compose service
 

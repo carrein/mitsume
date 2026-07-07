@@ -1,18 +1,16 @@
 name: Web image
 
-# Build the static web app into ghcr.io/carrein/mitsume:latest on every push to
-# main that touches the app. Watchtower on the server polls GHCR and redeploys
-# automatically (see docs/Deploy.md).
+# Build the static web app into ghcr.io/carrein/mitsume:latest on every release
+# tag (v*) — the same trigger as the Android APK workflow, so web and Android
+# always ship the same versioned commit. Watchtower on the server polls GHCR
+# and redeploys automatically (see docs/Deploy.md, docs/Release.md).
 #
 # CREDENTIAL-FREE: no secrets are used or needed. CalDAV auth is injected
 # server-side by the host Caddy on /dav/* (see docs/Deploy.md).
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - '.github/workflows/web-image.yml'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -39,6 +37,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/carrein/mitsume:latest
-            ghcr.io/carrein/mitsume:${{ github.sha }}
+            ghcr.io/carrein/mitsume:${{ github.ref_name }}
           build-args: |
             EXPO_PUBLIC_DAV_URL=/dav/
