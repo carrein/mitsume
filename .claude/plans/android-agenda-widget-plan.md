@@ -1,8 +1,15 @@
 # Android Agenda Widget — Implementation Plan
 Created: 2026-07-07
-Status: SHIPPED v0.2.3 (2026-07-07) — tap-to-open verified on-device from a dead
-app. Three field bugs found and fixed during Phase E; see §Field debugging (the
-load-bearing record — read before touching widget code or RNAW).
+Status: COMPLETE — v0.2.3 VERIFIED on-device 2026-07-07 (user: widget self-updates
+after in-app edits; foreground-resume pulls external events; dead-app tap opens;
+no OOM). Three field bugs found and fixed during Phase E; see §Field debugging
+(the load-bearing record — read before touching widget code or RNAW).
+
+Follow-up decision (2026-07-07): **calendar stays HTTP-pull — no WebSocket**, even
+after y-sweet lands for notes (y-sweet syncs Yjs docs, not Radicale changes; push
+would still need a custom Radicale watcher). External-change freshness =
+foreground revalidate + 3-min visible poll + best-effort 30-min widget cycle.
+Revisit trigger: felt staleness pain in daily use, not available infrastructure.
 
 ## Context
 
