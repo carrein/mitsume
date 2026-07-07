@@ -183,14 +183,16 @@ Three distinct bugs, each confirmed by logcat evidence before fixing:
    after mount (`_layout.tsx`) + widget resize capped 420×350dp (app.json) to
    bound worst-case bitmaps.
 
-**OPEN — widget background auto-refresh needs study (user-flagged 2026-07-07):**
-the ↻ tap and the 30-min cycle need background JS, which ColorOS kills at whim
-(same mechanism as bug 2; widget then shows last-good cache + stale timestamp).
-Foreground triggers (app open/resume, in-app mutations) are reliable. To study:
-how often the 30-min cycle actually completes in practice (instrument or observe
-the fetchedAt stamp over a day), whether RNAW's WorkManager job can be patched to
-expedited work, and whether caching CalDAV discovery (6→2 round-trips) shrinks
-the kill window enough to matter.
+**CLOSED — widget background auto-refresh: ACCEPTED as foreground-only
+(user decision 2026-07-07).** Measured: over multiple hours untouched, the
+widget's fetchedAt stamp never advanced — ColorOS kills every 30-min tick's
+process spawn (~2 s, before RN finishes booting), so effectively zero background
+refreshes complete on this device. Battery exemptions did not help. Accepted
+behavior: the widget refreshes on foreground triggers only (app open/resume,
+in-app mutations, ↻ while the process lives) and otherwise shows last-good cache
+with its honest timestamp. Untried ideas, if ever reopened: recents-lock the app
+(keeps the process cached so ticks skip the fatal spawn), or patch RNAW's
+WorkManager job to expedited.
 
 ## Risks & Open Questions
 - ~~**RNAW on RN 0.85/SDK 56 is maintainer-untested**~~ **RESOLVED** (2026-07-07):
