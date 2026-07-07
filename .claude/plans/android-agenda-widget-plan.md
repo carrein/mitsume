@@ -1,7 +1,8 @@
 # Android Agenda Widget — Implementation Plan
 Created: 2026-07-07
-Status: PHASES A–D COMPLETE (2026-07-07) — on main, CI + web image + APK smoke all
-green. Phase E (release cut v0.2.0 → Obtainium → on-phone verification) awaits go.
+Status: SHIPPED v0.2.3 (2026-07-07) — tap-to-open verified on-device from a dead
+app. Three field bugs found and fixed during Phase E; see §Field debugging (the
+load-bearing record — read before touching widget code or RNAW).
 
 ## Context
 
@@ -139,10 +140,53 @@ strict lint, prettier, 29 pure tests, clean web export, CI + Web image + a
 17-min cold APK smoke build all green. Key deviations recorded per phase above
 (OPEN_APP over deep link, platform-split over lazy require, polyfills at entry).
 
+## Field debugging (Phase E, 2026-07-07) — on-device via wireless adb (OnePlus
+CPH2841, ColorOS/OxygenOS, 560dpi, 256 MB app heap cap, Lawnchair launcher)
+
+Three distinct bugs, each confirmed by logcat evidence before fixing:
+
+1. **Blank widget — React Compiler vs RNAW's raw render** (fixed v0.2.1, `a47caf9`).
+   `reactCompiler: true` (app.json experiments) memoizes components with a hook;
+   RNAW calls widget components as raw functions (no React renderer) → logcat:
+   "Invalid Hook Call detected in Agenda". Fix: `'use no memo';` file directive in
+   `src/widget/agenda.tsx`. ANY new file defining widget JSX components needs the
+   same directive.
+
+2. **All taps dead — ColorOS kills background-spawned processes** (fixed for
+   OPEN_APP in v0.2.2, `2c1974a`). RNAW routes every click (incl. OPEN_APP) as a
+   broadcast → app receiver → `startActivity()`. Tap with dead app = background
+   process spawn, which ColorOS's cleaner kills ~2 s in (logcat: "Process
+   com.carrein.mitsume has died: prcl TRNB" — OplusHansManager). PendingIntents
+   showed `sent=true`: taps fired, receiver died. Battery toggles/deviceidle
+   whitelist did NOT help. Fix: `app/patches/react-native-android-widget@0.20.3.patch`
+   (bun patchedDependencies, compiled by CI prebuild) — OPEN_APP clickables get a
+   direct `PendingIntent.getActivity(launchIntent)`, launcher-fired like any
+   native widget (Etar comparison). Upstream: same undiagnosed symptom is
+   sAleksovski/react-native-android-widget#108 (MIUI, closed for lack of logs);
+   #33 has the maintainer describing the slow path. TODO: file upstream issue
+   with this evidence + patch. NOTE the patch is keyed to 0.20.3 — re-verify on
+   any RNAW upgrade.
+
+3. **App OOM-crash right after widget-tap launch** (fixed v0.2.3, `674d120`).
+   RNAW renders full widget + every ListWidget row as ARGB bitmaps, ×2 for the
+   light/dark pair (`CollectionView.getBitmap`); our refresh-on-open fired on
+   root-layout mount, stacking the bitmap burst on app-boot allocations → past
+   the 256 MB heap cap → `OutOfMemoryError`, process killed. Intermittent (timing
+   race) — "it went away" means dormant, not fixed. Fix: refresh deferred 5 s
+   after mount (`_layout.tsx`) + widget resize capped 420×350dp (app.json) to
+   bound worst-case bitmaps.
+
+**Residual known limitation (accepted):** background freshness is best-effort on
+ColorOS — the ↻ tap and the 30-min cycle need background JS, which the ROM kills
+at whim (same mechanism as bug 2; widget then shows last-good cache + stale
+timestamp). Every app open refreshes reliably (foreground). Possible future
+mitigations: patch RNAW's WorkManager job to expedited, or render-from-cache
+before fetching to shrink the kill window.
+
 ## Risks & Open Questions
-- ~~**RNAW on RN 0.85/SDK 56 is maintainer-untested**~~ **RESOLVED at build level**
-  (2026-07-07): APK smoke run 28815520295 green. Runtime behavior (headless handler,
-  ListWidget rendering, dark mode) still needs the on-phone pass in Phase E.
+- ~~**RNAW on RN 0.85/SDK 56 is maintainer-untested**~~ **RESOLVED** (2026-07-07):
+  builds green AND verified working on-device through v0.2.3 (render, dark mode,
+  tap-to-open from dead app).
 - **Headless timeout unverified** — cold fetch is ~6 round-trips; if updates silently miss,
   suspect the native task timeout first. Cache limits blast radius to staleness.
 - `resizeMode`/preview not confirmed as Expo-plugin fields — inspect the package's TS types
