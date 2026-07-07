@@ -63,5 +63,8 @@
   "private": true,
   "jest": {
     "preset": "jest-expo"
+  },
+  "patchedDependencies": {
+    "react-native-android-widget@0.20.3": "patches/react-native-android-widget@0.20.3.patch"
   }
 }

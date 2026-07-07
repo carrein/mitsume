@@ -1,0 +1,29 @@
+diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
+index 2d88172e426ccd70288005d4b7c15d7b534d20d9..94b8446ff307cfc41b08ca41ec15e8719fbe87a6 100644
+--- a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
++++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
+@@ -189,6 +189,24 @@ public class RNWidget {
+     }
+ 
+     private void registerClickTask(int id, ClickableView clickableView, RemoteViews widgetView, Integer button) {
++        // mitsume patch: OPEN_APP taps use a direct activity PendingIntent, like any
++        // native widget. The stock broadcast->receiver->startActivity path requires
++        // spawning the app process in the background, which OEM process killers
++        // (ColorOS "Hans"/prcl, MIUI) terminate before it can act (see upstream #108).
++        if ("OPEN_APP".equals(clickableView.getClickAction())) {
++            Intent launchIntent = appContext.getPackageManager()
++                .getLaunchIntentForPackage(appContext.getPackageName());
++            if (launchIntent != null) {
++                PendingIntent activityPendingIntent = PendingIntent.getActivity(
++                    appContext,
++                    button,
++                    launchIntent,
++                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
++                );
++                widgetView.setOnClickPendingIntent(button, activityPendingIntent);
++                return;
++            }
++        }
+         Intent intent = new Intent(appContext.getPackageName() + ".WIDGET_CLICK");
+         intent.setComponent(new ComponentName(appContext, RNWidgetUtil.getWidgetProviderClassName(appContext, widgetName)));
+         intent.putExtra("widgetId", id);
