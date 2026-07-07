@@ -4,6 +4,7 @@ import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
+import { VersionBadge } from '@/components/version-badge';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 export default function RootLayout() {
@@ -21,6 +22,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Slot />
+      <VersionBadge />
     </ThemeProvider>
   );
 }
