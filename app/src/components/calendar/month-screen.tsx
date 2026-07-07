@@ -16,6 +16,7 @@ import {
 
 import { restoreEvent } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
+import { refreshAgendaWidget } from '@/widget/app-refresh';
 import {
   EventEditor,
   type EditorResult,
@@ -103,6 +104,10 @@ export function MonthScreen() {
   function onEditorDone(result: EditorResult) {
     setEditor({ mode: 'closed' });
     refresh();
+    // The home-screen widget has no other way to learn about this mutation
+    // (its background cycle is unreliable on aggressive ROMs); foreground
+    // refresh here is the one dependable trigger.
+    refreshAgendaWidget();
     if (result === 'created') setSnack({ message: 'Event added' });
     else if (result === 'updated') setSnack({ message: 'Saved' });
     else if (result === 'conflict') {
@@ -115,6 +120,7 @@ export function MonthScreen() {
     try {
       await restoreEvent(event);
       refresh();
+      refreshAgendaWidget();
     } catch (err) {
       setSnack({
         message: err instanceof Error ? err.message : 'Could not restore event',
