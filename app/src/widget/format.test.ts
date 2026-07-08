@@ -1,46 +1,59 @@
-import { dayLabel, formatWhen } from './format';
+import { dayHeader, groupByDay } from './format';
+import type { WidgetEvent } from './types';
 
-const now = new Date(2026, 6, 7, 12, 0); // Tue 7 Jul 2026, noon
+const ev = (
+  start: Date,
+  overrides: Partial<WidgetEvent> = {}
+): WidgetEvent => ({
+  summary: 'x',
+  start: start.toISOString(),
+  end: new Date(start.getTime() + 3_600_000).toISOString(),
+  allDay: false,
+  ...overrides,
+});
 
-describe('dayLabel', () => {
-  it('labels today and tomorrow', () => {
-    expect(dayLabel(new Date(2026, 6, 7, 23, 59), now)).toBe('Today');
-    expect(dayLabel(new Date(2026, 6, 8, 0, 0), now)).toBe('Tomorrow');
+const now = new Date(2026, 6, 8, 12, 0); // Wed 8 Jul 2026, noon
+
+describe('dayHeader', () => {
+  it('formats weekday, day, and full month', () => {
+    expect(dayHeader(new Date(2026, 6, 13, 9, 0), now)).toBe('Mon 13 July');
+    expect(dayHeader(new Date(2026, 0, 1, 0, 0), now)).toBe('Thu 1 January');
   });
 
-  it('falls back to weekday + date', () => {
-    expect(dayLabel(new Date(2026, 6, 14, 9, 0), now)).toBe('Tue 14 Jul');
-  });
-
-  it('handles month rollover for tomorrow', () => {
-    const endOfMonth = new Date(2026, 6, 31, 12, 0);
-    expect(dayLabel(new Date(2026, 7, 1), endOfMonth)).toBe('Tomorrow');
+  it('marks today and tomorrow', () => {
+    expect(dayHeader(new Date(2026, 6, 8, 23, 0), now)).toBe(
+      'Wed 8 July · Today'
+    );
+    expect(dayHeader(new Date(2026, 6, 9, 1, 0), now)).toBe(
+      'Thu 9 July · Tomorrow'
+    );
   });
 });
 
-describe('formatWhen', () => {
-  it('shows time for timed events and a marker for all-day', () => {
-    expect(
-      formatWhen(
-        {
-          summary: 'x',
-          start: new Date(2026, 6, 7, 15, 0).toISOString(),
-          end: new Date(2026, 6, 7, 16, 0).toISOString(),
-          allDay: false,
-        },
-        now
-      )
-    ).toBe('Today 15:00');
-    expect(
-      formatWhen(
-        {
-          summary: 'x',
-          start: new Date(2026, 6, 8).toISOString(),
-          end: new Date(2026, 6, 9).toISOString(),
-          allDay: true,
-        },
-        now
-      )
-    ).toBe('Tomorrow · all day');
+describe('groupByDay', () => {
+  it('buckets by local start day, days ascending', () => {
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 14, 9, 0)),
+        ev(new Date(2026, 6, 13, 15, 0)),
+        ev(new Date(2026, 6, 13, 9, 0)),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual(['2026-07-13', '2026-07-14']);
+    expect(groups[0].header).toBe('Mon 13 July');
+    expect(groups[0].events).toHaveLength(2);
+    expect(groups[1].events).toHaveLength(1);
+  });
+
+  it('orders all-day before timed within a day', () => {
+    const [group] = groupByDay(
+      [
+        ev(new Date(2026, 6, 13, 9, 0), { summary: 'timed' }),
+        ev(new Date(2026, 6, 13, 0, 0), { summary: 'allday', allDay: true }),
+      ],
+      now
+    );
+    expect(group.events.map((e) => e.summary)).toEqual(['allday', 'timed']);
   });
 });

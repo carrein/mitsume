@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -60,15 +61,45 @@ export function MonthScreen() {
   const insets = useSafeAreaInsets();
   const today = toDateString(new Date());
 
+  // A widget tap deep-links here as `?day=YYYY-MM-DD` (see the agenda widget);
+  // land the calendar on that day. Null for a normal app open or a bad value.
+  const params = useLocalSearchParams<{ day?: string }>();
+  const dayParam =
+    typeof params.day === 'string' && parseDay(params.day) ? params.day : null;
+
   const bottomInset = Platform.select({
     web: Spacing.four,
     default: insets.bottom + Spacing.three,
   });
 
-  const [visibleMonth, setVisibleMonth] = useState(() => new Date());
-  const [selectedDay, setSelectedDay] = useState(today);
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const parsed = dayParam ? parseDay(dayParam) : null;
+    return parsed
+      ? new Date(parsed.getFullYear(), parsed.getMonth(), 1)
+      : new Date();
+  });
+  const [selectedDay, setSelectedDay] = useState(dayParam ?? today);
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' });
   const [snack, setSnack] = useState<Snack>(null);
+
+  // A deep link that changes `?day=` while mounted (warm start) is reconciled
+  // here — the React-recommended "adjust state during render" alternative to a
+  // setState effect. Cold start already seeds selectedDay/visibleMonth above.
+  const [handledDayParam, setHandledDayParam] = useState(dayParam);
+  if (dayParam && dayParam !== handledDayParam) {
+    const parsed = parseDay(dayParam);
+    setHandledDayParam(dayParam);
+    setSelectedDay(dayParam);
+    if (parsed) {
+      const first = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+      setVisibleMonth((prev) =>
+        prev.getFullYear() === first.getFullYear() &&
+        prev.getMonth() === first.getMonth()
+          ? prev
+          : first
+      );
+    }
+  }
 
   const { events, loading, error, refresh } = useMonthEvents(visibleMonth);
 
@@ -137,8 +168,19 @@ export function MonthScreen() {
     [sections]
   );
 
-  // Once per month: start the agenda at today (current month) or at the top.
+  // Deep-linked day: scroll to it once its month's events are loaded — covers
+  // both a cold start (state seeded above) and a warm one (adjusted above).
   const autoScrolledMonth = useRef<string | null>(null);
+  const scrolledForParam = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dayParam || scrolledForParam.current === dayParam) return;
+    if (!dayParam.startsWith(monthPrefix) || sections.length === 0) return;
+    scrolledForParam.current = dayParam;
+    autoScrolledMonth.current = monthPrefix; // claim the month so today-scroll skips
+    scrollToDay(dayParam, false);
+  }, [dayParam, monthPrefix, sections, scrollToDay]);
+
+  // Otherwise, once per month, start the agenda at today (current month) or top.
   useEffect(() => {
     if (sections.length === 0) return;
     if (autoScrolledMonth.current === monthPrefix) return;

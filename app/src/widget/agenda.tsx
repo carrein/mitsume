@@ -14,9 +14,9 @@ import type { WidgetRepresentation } from 'react-native-android-widget';
 
 import { davConfigured } from '@/config';
 import { AccentColor, Colors, type ThemeColor } from '@/constants/theme';
-import { toTimeString } from '@/utils/date';
+import { toDateString, toTimeString } from '@/utils/date';
 
-import { formatWhen } from './format';
+import { groupByDay } from './format';
 import type { WidgetCache, WidgetEvent } from './types';
 
 type Palette = Record<ThemeColor, string>;
@@ -24,27 +24,40 @@ type Palette = Record<ThemeColor, string>;
 /** Theme colors are plain strings; widget ColorProp wants a hex template type. */
 const hex = (c: string) => c as `#${string}`;
 
+/** Heading that opens a day group, e.g. 'Mon 13 July'. */
+function DayHeader({ label, palette }: { label: string; palette: Palette }) {
+  return (
+    <FlexWidget
+      style={{ width: 'match_parent', paddingTop: 8, paddingBottom: 2 }}
+    >
+      <TextWidget
+        text={label}
+        style={{
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: hex(palette.textSecondary),
+        }}
+      />
+    </FlexWidget>
+  );
+}
+
+/** One event; tapping deep-links the app to this event's day. */
 function EventRow({
   event,
-  now,
   palette,
 }: {
   event: WidgetEvent;
-  now: Date;
   palette: Palette;
 }) {
-  const detail = event.location
-    ? `${formatWhen(event, now)} · ${event.location}`
-    : formatWhen(event, now);
+  const day = toDateString(new Date(event.start));
   return (
     <FlexWidget
-      clickAction="OPEN_APP"
+      clickAction="OPEN_URI"
+      clickActionData={{ uri: `app:///?day=${day}` }}
       style={{
         width: 'match_parent',
         flexDirection: 'column',
-        borderLeftWidth: 2,
-        borderLeftColor: hex(AccentColor),
-        paddingLeft: 8,
         paddingVertical: 3,
         marginBottom: 6,
       }}
@@ -55,12 +68,25 @@ function EventRow({
         truncate="END"
         style={{ fontSize: 13, color: hex(palette.text) }}
       />
-      <TextWidget
-        text={detail}
-        maxLines={1}
-        truncate="END"
-        style={{ fontSize: 11, color: hex(palette.textSecondary) }}
-      />
+      {event.allDay ? (
+        <TextWidget
+          text="All day"
+          style={{ fontSize: 11, color: hex(AccentColor) }}
+        />
+      ) : (
+        <TextWidget
+          text={toTimeString(new Date(event.start))}
+          style={{ fontSize: 11, color: hex(palette.textSecondary) }}
+        />
+      )}
+      {event.location ? (
+        <TextWidget
+          text={event.location}
+          maxLines={1}
+          truncate="END"
+          style={{ fontSize: 11, color: hex(palette.textSecondary) }}
+        />
+      ) : null}
     </FlexWidget>
   );
 }
@@ -91,14 +117,20 @@ function Body({
   }
   return (
     <ListWidget style={{ width: 'match_parent', height: 'match_parent' }}>
-      {cache!.events.map((event) => (
-        <EventRow
-          key={`${event.start}:${event.summary}`}
-          event={event}
-          now={now}
+      {groupByDay(cache!.events, now).flatMap((group) => [
+        <DayHeader
+          key={`h:${group.day}`}
+          label={group.header}
           palette={palette}
-        />
-      ))}
+        />,
+        ...group.events.map((event) => (
+          <EventRow
+            key={`${event.start}:${event.summary}`}
+            event={event}
+            palette={palette}
+          />
+        )),
+      ])}
     </ListWidget>
   );
 }
@@ -128,36 +160,40 @@ function Agenda({
         style={{
           width: 'match_parent',
           flexDirection: 'row',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          marginBottom: 6,
         }}
       >
-        <TextWidget
-          text="Agenda"
-          style={{
-            fontSize: 14,
-            fontWeight: 'bold',
-            color: hex(AccentColor),
-          }}
-        />
         <FlexWidget
           clickAction="REFRESH"
-          style={{ padding: 4 }}
+          style={{ paddingHorizontal: 6, paddingVertical: 2 }}
           accessibilityLabel="Refresh events"
         >
           <TextWidget
-            text={cache ? `↻ ${toTimeString(new Date(cache.fetchedAt))}` : '↻'}
-            style={{ fontSize: 12, color: hex(palette.textSecondary) }}
+            text="↻"
+            style={{ fontSize: 20, color: hex(AccentColor) }}
           />
         </FlexWidget>
       </FlexWidget>
-      <Body cache={cache} now={now} palette={palette} />
+      <FlexWidget style={{ width: 'match_parent', flex: 1 }}>
+        <Body cache={cache} now={now} palette={palette} />
+      </FlexWidget>
+      {cache ? (
+        <TextWidget
+          text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
+          style={{
+            fontSize: 10,
+            color: hex(palette.textSecondary),
+            marginTop: 4,
+          }}
+        />
+      ) : null}
     </FlexWidget>
   );
 }
 
-/** Light/dark pair for the launcher; `now` fixed once so both halves agree. */
+/** Light/dark pair so the launcher can match the system theme; `now` fixed once
+ * so both halves and every day header agree. */
 export function renderAgenda(cache: WidgetCache | null): WidgetRepresentation {
   const now = new Date();
   return {
