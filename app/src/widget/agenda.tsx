@@ -160,10 +160,19 @@ function Agenda({
         style={{
           width: 'match_parent',
           flexDirection: 'row',
-          justifyContent: 'flex-end',
+          justifyContent: 'space-between',
           alignItems: 'center',
+          marginBottom: 4,
         }}
       >
+        <TextWidget
+          text={
+            cache
+              ? `Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`
+              : ''
+          }
+          style={{ fontSize: 10, color: hex(palette.textSecondary) }}
+        />
         <FlexWidget
           clickAction="REFRESH"
           style={{ paddingHorizontal: 6, paddingVertical: 2 }}
@@ -175,19 +184,7 @@ function Agenda({
           />
         </FlexWidget>
       </FlexWidget>
-      <FlexWidget style={{ width: 'match_parent', flex: 1 }}>
-        <Body cache={cache} now={now} palette={palette} />
-      </FlexWidget>
-      {cache ? (
-        <TextWidget
-          text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
-          style={{
-            fontSize: 10,
-            color: hex(palette.textSecondary),
-            marginTop: 4,
-          }}
-        />
-      ) : null}
+      <Body cache={cache} now={now} palette={palette} />
     </FlexWidget>
   );
 }
