@@ -8,21 +8,36 @@
 import {
   FlexWidget,
   ListWidget,
+  SvgWidget,
   TextWidget,
 } from 'react-native-android-widget';
 import type { WidgetRepresentation } from 'react-native-android-widget';
 
 import { davConfigured } from '@/config';
-import { AccentColor, Colors, type ThemeColor } from '@/constants/theme';
+import {
+  AccentColor,
+  Colors,
+  FontFamily,
+  FontFamilyBold,
+  type ThemeColor,
+} from '@/constants/theme';
 import { toDateString, toTimeString } from '@/utils/date';
 
-import { groupByDay } from './format';
+import { groupByDay, headerDate } from './format';
 import type { WidgetCache, WidgetEvent } from './types';
 
 type Palette = Record<ThemeColor, string>;
 
 /** Theme colors are plain strings; widget ColorProp wants a hex template type. */
 const hex = (c: string) => c as `#${string}`;
+
+// Lucide icons (https://lucide.dev) — the app's icon set. White stroke, one
+// identical size via SvgWidget so the two widget icons always match. The app
+// renders the same `plus` / `rotate-cw` via lucide-react-native.
+const LUCIDE_ATTRS =
+  'fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+const ADD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${LUCIDE_ATTRS}><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
+const REFRESH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${LUCIDE_ATTRS}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`;
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
 function DayHeader({ label, palette }: { label: string; palette: Palette }) {
@@ -34,7 +49,7 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
         text={label}
         style={{
           fontSize: 12,
-          fontWeight: 'bold',
+          fontFamily: FontFamilyBold,
           color: hex(palette.textSecondary),
         }}
       />
@@ -66,17 +81,29 @@ function EventRow({
         text={event.summary || '(untitled)'}
         maxLines={1}
         truncate="END"
-        style={{ fontSize: 13, color: hex(palette.text) }}
+        style={{
+          fontSize: 13,
+          fontFamily: FontFamily,
+          color: hex(palette.text),
+        }}
       />
       {event.allDay ? (
         <TextWidget
           text="All day"
-          style={{ fontSize: 11, color: hex(AccentColor) }}
+          style={{
+            fontSize: 11,
+            fontFamily: FontFamily,
+            color: hex(AccentColor),
+          }}
         />
       ) : (
         <TextWidget
           text={toTimeString(new Date(event.start))}
-          style={{ fontSize: 11, color: hex(palette.textSecondary) }}
+          style={{
+            fontSize: 11,
+            fontFamily: FontFamily,
+            color: hex(palette.textSecondary),
+          }}
         />
       )}
       {event.location ? (
@@ -84,7 +111,11 @@ function EventRow({
           text={event.location}
           maxLines={1}
           truncate="END"
-          style={{ fontSize: 11, color: hex(palette.textSecondary) }}
+          style={{
+            fontSize: 11,
+            fontFamily: FontFamily,
+            color: hex(palette.textSecondary),
+          }}
         />
       ) : null}
     </FlexWidget>
@@ -111,7 +142,11 @@ function Body({
     return (
       <TextWidget
         text={message}
-        style={{ fontSize: 12, color: hex(palette.textSecondary) }}
+        style={{
+          fontSize: 12,
+          fontFamily: FontFamily,
+          color: hex(palette.textSecondary),
+        }}
       />
     );
   }
@@ -144,6 +179,7 @@ function Agenda({
   now: Date;
   palette: Palette;
 }) {
+  const white = hex('#ffffff');
   return (
     <FlexWidget
       clickAction="OPEN_APP"
@@ -153,38 +189,73 @@ function Agenda({
         flexDirection: 'column',
         backgroundColor: hex(palette.background),
         borderRadius: 16,
-        padding: 12,
       }}
     >
+      {/* Orange header bar: today's date + freshness on the left, add/refresh right */}
       <FlexWidget
         style={{
           width: 'match_parent',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 4,
+          flexDirection: 'column',
+          backgroundColor: hex(AccentColor),
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          paddingHorizontal: 12,
+          paddingTop: 10,
+          paddingBottom: 8,
         }}
       >
-        <TextWidget
-          text={
-            cache
-              ? `Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`
-              : ''
-          }
-          style={{ fontSize: 10, color: hex(palette.textSecondary) }}
-        />
         <FlexWidget
-          clickAction="REFRESH"
-          style={{ paddingHorizontal: 6, paddingVertical: 2 }}
-          accessibilityLabel="Refresh events"
+          style={{
+            width: 'match_parent',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
         >
           <TextWidget
-            text="↻"
-            style={{ fontSize: 20, color: hex(AccentColor) }}
+            text={headerDate(now)}
+            style={{ fontSize: 20, fontFamily: FontFamilyBold, color: white }}
           />
+          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <FlexWidget
+              clickAction="OPEN_URI"
+              clickActionData={{ uri: `app:///?new=${now.getTime()}` }}
+              style={{ padding: 4 }}
+              accessibilityLabel="Add event"
+            >
+              <SvgWidget svg={ADD_ICON} style={{ width: 20, height: 20 }} />
+            </FlexWidget>
+            <FlexWidget
+              clickAction="REFRESH"
+              style={{ padding: 4 }}
+              accessibilityLabel="Refresh events"
+            >
+              <SvgWidget svg={REFRESH_ICON} style={{ width: 20, height: 20 }} />
+            </FlexWidget>
+          </FlexWidget>
         </FlexWidget>
+        {cache ? (
+          <TextWidget
+            text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
+            style={{
+              fontSize: 10,
+              fontFamily: FontFamily,
+              color: white,
+              marginTop: 2,
+            }}
+          />
+        ) : null}
       </FlexWidget>
-      <Body cache={cache} now={now} palette={palette} />
+      <FlexWidget
+        style={{
+          width: 'match_parent',
+          flex: 1,
+          paddingHorizontal: 12,
+          paddingTop: 8,
+        }}
+      >
+        <Body cache={cache} now={now} palette={palette} />
+      </FlexWidget>
     </FlexWidget>
   );
 }

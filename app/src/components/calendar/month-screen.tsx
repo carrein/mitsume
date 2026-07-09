@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { Plus, RotateCw } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,7 +24,12 @@ import {
 } from '@/components/calendar/event-editor';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  AccentColor,
+  FontFamily,
+  MaxContentWidth,
+  Spacing,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import { useTheme } from '@/hooks/use-theme';
@@ -61,11 +66,12 @@ export function MonthScreen() {
   const insets = useSafeAreaInsets();
   const today = toDateString(new Date());
 
-  // A widget tap deep-links here as `?day=YYYY-MM-DD` (see the agenda widget);
-  // land the calendar on that day. Null for a normal app open or a bad value.
-  const params = useLocalSearchParams<{ day?: string }>();
+  // Widget deep links: `?day=YYYY-MM-DD` lands the calendar on that day; `?new=`
+  // (a nonce so repeat taps re-fire) opens the new-event editor. Null otherwise.
+  const params = useLocalSearchParams<{ day?: string; new?: string }>();
   const dayParam =
     typeof params.day === 'string' && parseDay(params.day) ? params.day : null;
+  const newParam = typeof params.new === 'string' ? params.new : null;
 
   const bottomInset = Platform.select({
     web: Spacing.four,
@@ -79,8 +85,18 @@ export function MonthScreen() {
       : new Date();
   });
   const [selectedDay, setSelectedDay] = useState(dayParam ?? today);
-  const [editor, setEditor] = useState<EditorState>({ mode: 'closed' });
+  const [editor, setEditor] = useState<EditorState>(
+    newParam ? { mode: 'create', day: today } : { mode: 'closed' }
+  );
   const [snack, setSnack] = useState<Snack>(null);
+
+  // The widget's `+` deep-links `?new=<nonce>`; open the new-event editor (dated
+  // today). Cold start seeds it above; a fresh nonce (warm start) re-opens here.
+  const [handledNewParam, setHandledNewParam] = useState(newParam);
+  if (newParam && newParam !== handledNewParam) {
+    setHandledNewParam(newParam);
+    setEditor({ mode: 'create', day: today });
+  }
 
   // A deep link that changes `?day=` while mounted (warm start) is reconciled
   // here — the React-recommended "adjust state during render" alternative to a
@@ -271,6 +287,9 @@ export function MonthScreen() {
               arrowColor: AccentColor,
               selectedDayBackgroundColor: AccentColor,
               selectedDayTextColor: '#ffffff',
+              textDayFontFamily: FontFamily,
+              textMonthFontFamily: FontFamily,
+              textDayHeaderFontFamily: FontFamily,
             }}
           />
 
@@ -292,15 +311,7 @@ export function MonthScreen() {
               {monthLabel}
             </ThemedText>
             <Pressable onPress={refresh} hitSlop={8}>
-              <SymbolView
-                name={{
-                  ios: 'arrow.clockwise',
-                  android: 'refresh',
-                  web: 'refresh',
-                }}
-                size={16}
-                tintColor={theme.textSecondary}
-              />
+              <RotateCw size={16} color={theme.textSecondary} />
             </Pressable>
           </View>
 
@@ -414,7 +425,7 @@ export function MonthScreen() {
         ]}
         accessibilityLabel="Add event"
       >
-        <ThemedText style={styles.fabLabel}>＋</ThemedText>
+        <Plus size={28} color="#ffffff" />
       </Pressable>
 
       {snack && (
@@ -538,11 +549,6 @@ const styles = StyleSheet.create({
   },
   fabPressed: {
     opacity: 0.85,
-  },
-  fabLabel: {
-    color: '#ffffff',
-    fontSize: 24,
-    lineHeight: 28,
   },
   snackWrapper: {
     position: 'absolute',

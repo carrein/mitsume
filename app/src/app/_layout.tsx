@@ -1,5 +1,6 @@
 import '@/polyfills';
 
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
@@ -10,6 +11,12 @@ import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  // Web loads Monaspace Krypton at runtime (@font-face injection); native embeds
+  // it via the expo-font config plugin (and the widget reads assets/fonts).
+  useFonts({
+    MonaspaceKrypton: require('../../assets/fonts/MonaspaceKrypton.otf'),
+    MonaspaceKrypton_bold: require('../../assets/fonts/MonaspaceKrypton_bold.otf'),
+  });
   useSilentReload();
   useEffect(() => {
     // DEFERRED on purpose — do not fire this during boot. The widget render

@@ -38,10 +38,10 @@ export const Fonts = Platform.select({
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+    sans: 'MonaspaceKrypton',
+    serif: 'MonaspaceKrypton',
+    rounded: 'MonaspaceKrypton',
+    mono: 'MonaspaceKrypton',
   },
   web: {
     sans: 'var(--font-display)',
@@ -64,6 +64,14 @@ export const Spacing = {
 export const MaxContentWidth = 800;
 /** Minimum window width for the side-by-side notes + calendar layout. */
 export const WideLayoutMinWidth = 768;
+
+/**
+ * Monaspace Krypton — the app's single typeface (files in assets/fonts). One
+ * family name resolves everywhere: RN + web (@font-face), and the RNAW widget,
+ * which loads assets/fonts/<name>.otf by basename. Bold is a separate face.
+ */
+export const FontFamily = 'MonaspaceKrypton';
+export const FontFamilyBold = 'MonaspaceKrypton_bold';
 
 /** Brand accent (matches the app icon). */
 export const AccentColor = '#FF9500';

@@ -21,6 +21,26 @@ const MONTHS = [
   'December',
 ] as const;
 
+const MONTHS_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** Header date line, e.g. 'Thu • 9 Jul' (local tz). */
+export function headerDate(now: Date): string {
+  return `${WEEKDAYS[now.getDay()]} • ${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
+}
+
 function sameLocalDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&

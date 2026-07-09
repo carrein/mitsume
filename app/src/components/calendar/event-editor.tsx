@@ -18,7 +18,7 @@ import {
 import type { CalEvent, EventChanges } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
+import { AccentColor, DangerColor, Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   nextFullHour,
@@ -72,7 +72,10 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const inputStyle = [styles.input, { color: theme.text }];
+  const inputStyle = [
+    styles.input,
+    { color: theme.text, fontFamily: Fonts.sans },
+  ];
   const placeholderColor = theme.textSecondary;
 
   function resolveTimes(): { start: Date; end: Date } | null {

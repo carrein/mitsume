@@ -1,4 +1,4 @@
-import { dayHeader, groupByDay } from './format';
+import { dayHeader, groupByDay, headerDate } from './format';
 import type { WidgetEvent } from './types';
 
 const ev = (
@@ -13,6 +13,12 @@ const ev = (
 });
 
 const now = new Date(2026, 6, 8, 12, 0); // Wed 8 Jul 2026, noon
+
+describe('headerDate', () => {
+  it('formats weekday • day short-month', () => {
+    expect(headerDate(new Date(2026, 6, 9, 8, 0))).toBe('Thu • 9 Jul');
+  });
+});
 
 describe('dayHeader', () => {
   it('formats weekday, day, and full month', () => {

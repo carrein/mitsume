@@ -25,6 +25,15 @@
     "plugins": [
       "expo-router",
       [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/MonaspaceKrypton.otf",
+            "./assets/fonts/MonaspaceKrypton_bold.otf"
+          ]
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
