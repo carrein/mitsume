@@ -14,7 +14,12 @@ MinIO planned for notes). Targets web + Android (Obtainium) — no iOS.
   `android-builder/` (local sign + release scripts).
 - `.claude/plans/` — implementation plans and build logs (historical record).
 
-## Dev loop (bun only — no Node on this machine)
+## Dev loop (bun for everything EXCEPT the local Android/emulator build)
+
+Bun is the runtime everywhere — web, checks, tests, package installs. The one
+exception is the local Android build (`android:dev`): its Gradle steps shell out
+to real `node`, and bun can't stand in for it, so Node is installed on this
+machine specifically for that build. See the Android bullet below.
 
 - Always `cd app/` first, then `bun run --bun web:proxy` (forces the
   same-origin `/dav/` URL; plain `web` bakes the tailnet URL from `app/.env`
@@ -22,9 +27,13 @@ MinIO planned for notes). Targets web + Android (Obtainium) — no iOS.
 - Web e2e: `tooling/e2e/run.sh` — dockerized Playwright + a throwaway Radicale
   behind its own Caddy on :8881 (never touches the real calendar). Needs Metro
   running (`web:proxy`).
-- Android hot reload: `bun run android:dev` (debug build under
-  `com.carrein.mitsume.dev`, coexists with the release app; needs the local
-  Android SDK — installed 2026-07-07 via Android Studio, env in `~/.zshrc`).
+- Android hot reload: plain `bun run android:dev` — do NOT add `--bun`. Unlike
+  `web:proxy`, this build must use real Node: the Gradle steps shell out to
+  `node` (expo autolinking, entry resolution), and `--bun` shims `node`→bun and
+  breaks the build in ~3s at `settings.gradle` (`command 'node' … exit value 1`).
+  (debug build under `com.carrein.mitsume.dev`, coexists with the release app;
+  needs the local Android SDK — installed 2026-07-07 via Android Studio, env in
+  `~/.zshrc`.)
 - Browse the dockerized dev proxy at `http://localhost:8880` (injects DAV
   auth), NOT Metro's `:8081` directly (CORS). Start it from
   `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
