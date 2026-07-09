@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { CirclePlus, RefreshCw } from 'lucide-react-native';
+import { AddIcon, RefreshIcon } from '@/components/icons';
 import {
   type ComponentProps,
   useCallback,
@@ -298,14 +298,14 @@ export function MonthScreen() {
                 textDayFontFamily: FontFamily,
                 textMonthFontFamily: FontFamily,
                 textDayHeaderFontFamily: FontFamily,
-                // Square the selected/today day highlight (no rounded corners).
+                // Round the selected/today day highlight to 4px.
                 'stylesheet.day.basic': {
                   selected: {
                     backgroundColor: AccentColor,
-                    borderRadius: 0,
+                    borderRadius: Spacing.one,
                   },
                   today: {
-                    borderRadius: 0,
+                    borderRadius: Spacing.one,
                   },
                 },
               } as ComponentProps<typeof Calendar>['theme']
@@ -330,7 +330,7 @@ export function MonthScreen() {
               {monthLabel}
             </ThemedText>
             <Pressable onPress={refresh} hitSlop={8}>
-              <RefreshCw size={16} color={theme.textSecondary} />
+              <RefreshIcon size={16} color={theme.textSecondary} />
             </Pressable>
           </View>
 
@@ -444,7 +444,7 @@ export function MonthScreen() {
         ]}
         accessibilityLabel="Add event"
       >
-        <CirclePlus size={28} color="#ffffff" />
+        <AddIcon size={28} color="#ffffff" />
       </Pressable>
 
       {snack && (
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   setupCard: {
     gap: Spacing.three,
     padding: Spacing.four,
-    borderRadius: 0,
+    borderRadius: Spacing.one,
     maxWidth: 480,
   },
   errorBanner: {
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: 0,
+    borderRadius: Spacing.one,
     marginTop: Spacing.two,
   },
   errorText: {
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: 0,
+    borderRadius: Spacing.one,
   },
   eventTime: {
     width: 52,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
     right: Spacing.four,
     width: 56,
     height: 56,
-    borderRadius: 0,
+    borderRadius: Spacing.one,
     backgroundColor: AccentColor,
     alignItems: 'center',
     justifyContent: 'center',
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.four,
     backgroundColor: '#2E3135',
-    borderRadius: 0,
+    borderRadius: Spacing.one,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     maxWidth: 480,

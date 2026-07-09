@@ -20,7 +20,6 @@
     "expo-web-browser": "~56.0.5",
     "ical-expander": "^3.2.0",
     "ical.js": "^2.2.1",
-    "lucide-react-native": "^1.23.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",

@@ -22,6 +22,11 @@ import {
   FontFamilyBold,
   type ThemeColor,
 } from '@/constants/theme';
+import {
+  AddOutlineBody,
+  RefreshOutlineBody,
+  SunOutlineBody,
+} from '@/constants/icon-paths';
 import { toDateString, toTimeString } from '@/utils/date';
 
 import { groupByDay, headerDate } from './format';
@@ -32,22 +37,15 @@ type Palette = Record<ThemeColor, string>;
 /** Theme colors are plain strings; widget ColorProp wants a hex template type. */
 const hex = (c: string) => c as `#${string}`;
 
-// Lucide icons (https://lucide.dev) — the app's icon set, rendered via SvgWidget.
-// The app renders the same `circle-plus` / `refresh-cw` via lucide-react-native.
-const lucideSvg = (stroke: string, paths: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-const ADD_ICON = lucideSvg(
-  '#ffffff',
-  '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>'
-);
-const REFRESH_ICON = lucideSvg(
-  '#ffffff',
-  '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'
-);
-const SUN_ICON = lucideSvg(
-  AccentColor,
-  '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'
-);
+// Basil icons (https://icon-sets.iconify.design/basil/) — the app's icon set,
+// rendered via SvgWidget. The in-app screens render the same add / refresh glyphs
+// via components/icons.tsx; shared 24x24 path data lives in constants/icon-paths.
+// Basil bodies are fill-based, so we swap `currentColor` for the actual color.
+const basilSvg = (fill: string, body: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
+const ADD_ICON = basilSvg('#ffffff', AddOutlineBody);
+const REFRESH_ICON = basilSvg('#ffffff', RefreshOutlineBody);
+const SUN_ICON = basilSvg(AccentColor, SunOutlineBody);
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
 function DayHeader({ label, palette }: { label: string; palette: Palette }) {
@@ -246,61 +244,57 @@ function Agenda({
         width: 'match_parent',
         height: 'match_parent',
         flexDirection: 'column',
+        borderRadius: 4,
         backgroundColor: hex(palette.background),
       }}
     >
-      {/* Orange header bar: today's date + freshness on the left, add/refresh right */}
+      {/* Orange header bar: date + freshness stacked left, add/refresh vertically centered right */}
       <FlexWidget
         style={{
           width: 'match_parent',
-          flexDirection: 'column',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           backgroundColor: hex(AccentColor),
           paddingHorizontal: 16,
           paddingTop: 10,
           paddingBottom: 8,
         }}
       >
-        <FlexWidget
-          style={{
-            width: 'match_parent',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
+        <FlexWidget style={{ flexDirection: 'column' }}>
           <TextWidget
             text={headerDate(now)}
             style={{ fontSize: 20, fontFamily: FontFamilyBold, color: white }}
           />
-          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <FlexWidget
-              clickAction="OPEN_URI"
-              clickActionData={{ uri: `app:///?new=${now.getTime()}` }}
-              style={{ padding: 6 }}
-              accessibilityLabel="Add event"
-            >
-              <SvgWidget svg={ADD_ICON} style={{ width: 20, height: 20 }} />
-            </FlexWidget>
-            <FlexWidget
-              clickAction="REFRESH"
-              style={{ padding: 6, marginLeft: 6 }}
-              accessibilityLabel="Refresh events"
-            >
-              <SvgWidget svg={REFRESH_ICON} style={{ width: 20, height: 20 }} />
-            </FlexWidget>
+          {cache ? (
+            <TextWidget
+              text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
+              style={{
+                fontSize: 12,
+                fontFamily: FontFamily,
+                color: white,
+                marginTop: 0,
+              }}
+            />
+          ) : null}
+        </FlexWidget>
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <FlexWidget
+            clickAction="OPEN_URI"
+            clickActionData={{ uri: `app:///?new=${now.getTime()}` }}
+            style={{ padding: 6 }}
+            accessibilityLabel="Add event"
+          >
+            <SvgWidget svg={ADD_ICON} style={{ width: 20, height: 20 }} />
+          </FlexWidget>
+          <FlexWidget
+            clickAction="REFRESH"
+            style={{ padding: 6, marginLeft: 6 }}
+            accessibilityLabel="Refresh events"
+          >
+            <SvgWidget svg={REFRESH_ICON} style={{ width: 20, height: 20 }} />
           </FlexWidget>
         </FlexWidget>
-        {cache ? (
-          <TextWidget
-            text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
-            style={{
-              fontSize: 12,
-              fontFamily: FontFamily,
-              color: white,
-              marginTop: 0,
-            }}
-          />
-        ) : null}
       </FlexWidget>
       <FlexWidget
         style={{

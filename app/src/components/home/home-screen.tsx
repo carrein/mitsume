@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
   paneButton: {
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
-    borderRadius: 0,
+    borderRadius: Spacing.one,
   },
 });
