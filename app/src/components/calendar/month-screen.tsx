@@ -1,6 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Plus, RotateCw } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CirclePlus, RefreshCw } from 'lucide-react-native';
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -277,20 +284,32 @@ export function MonthScreen() {
               setVisibleMonth(new Date(month.year, month.month - 1, 1))
             }
             markedDates={markedDates}
-            theme={{
-              calendarBackground: 'transparent',
-              monthTextColor: theme.text,
-              dayTextColor: theme.text,
-              textDisabledColor: theme.textSecondary,
-              textSectionTitleColor: theme.textSecondary,
-              todayTextColor: AccentColor,
-              arrowColor: AccentColor,
-              selectedDayBackgroundColor: AccentColor,
-              selectedDayTextColor: '#ffffff',
-              textDayFontFamily: FontFamily,
-              textMonthFontFamily: FontFamily,
-              textDayHeaderFontFamily: FontFamily,
-            }}
+            theme={
+              {
+                calendarBackground: 'transparent',
+                monthTextColor: theme.text,
+                dayTextColor: theme.text,
+                textDisabledColor: theme.textSecondary,
+                textSectionTitleColor: theme.textSecondary,
+                todayTextColor: AccentColor,
+                arrowColor: AccentColor,
+                selectedDayBackgroundColor: AccentColor,
+                selectedDayTextColor: '#ffffff',
+                textDayFontFamily: FontFamily,
+                textMonthFontFamily: FontFamily,
+                textDayHeaderFontFamily: FontFamily,
+                // Square the selected/today day highlight (no rounded corners).
+                'stylesheet.day.basic': {
+                  selected: {
+                    backgroundColor: AccentColor,
+                    borderRadius: 0,
+                  },
+                  today: {
+                    borderRadius: 0,
+                  },
+                },
+              } as ComponentProps<typeof Calendar>['theme']
+            }
           />
 
           {error && (
@@ -311,7 +330,7 @@ export function MonthScreen() {
               {monthLabel}
             </ThemedText>
             <Pressable onPress={refresh} hitSlop={8}>
-              <RotateCw size={16} color={theme.textSecondary} />
+              <RefreshCw size={16} color={theme.textSecondary} />
             </Pressable>
           </View>
 
@@ -425,7 +444,7 @@ export function MonthScreen() {
         ]}
         accessibilityLabel="Add event"
       >
-        <Plus size={28} color="#ffffff" />
+        <CirclePlus size={28} color="#ffffff" />
       </Pressable>
 
       {snack && (
@@ -485,7 +504,7 @@ const styles = StyleSheet.create({
   setupCard: {
     gap: Spacing.three,
     padding: Spacing.four,
-    borderRadius: Spacing.three,
+    borderRadius: 0,
     maxWidth: 480,
   },
   errorBanner: {
@@ -494,7 +513,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.two,
+    borderRadius: 0,
     marginTop: Spacing.two,
   },
   errorText: {
@@ -527,7 +546,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.two,
+    borderRadius: 0,
   },
   eventTime: {
     width: 52,
@@ -541,7 +560,7 @@ const styles = StyleSheet.create({
     right: Spacing.four,
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 0,
     backgroundColor: AccentColor,
     alignItems: 'center',
     justifyContent: 'center',
@@ -562,7 +581,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.four,
     backgroundColor: '#2E3135',
-    borderRadius: Spacing.two,
+    borderRadius: 0,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     maxWidth: 480,

@@ -5,13 +5,14 @@
 // JSX tree for the Android home-screen agenda — react-native-android-widget
 // primitives (not RN views), rendered headlessly by the task handler. The
 // light/dark pair lets the launcher pick the palette that matches the system.
+import type { ReactNode } from 'react';
+import type { WidgetRepresentation } from 'react-native-android-widget';
 import {
   FlexWidget,
   ListWidget,
   SvgWidget,
   TextWidget,
 } from 'react-native-android-widget';
-import type { WidgetRepresentation } from 'react-native-android-widget';
 
 import { davConfigured } from '@/config';
 import {
@@ -31,26 +32,40 @@ type Palette = Record<ThemeColor, string>;
 /** Theme colors are plain strings; widget ColorProp wants a hex template type. */
 const hex = (c: string) => c as `#${string}`;
 
-// Lucide icons (https://lucide.dev) — the app's icon set. White stroke, one
-// identical size via SvgWidget so the two widget icons always match. The app
-// renders the same `plus` / `rotate-cw` via lucide-react-native.
-const LUCIDE_ATTRS =
-  'fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-const ADD_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${LUCIDE_ATTRS}><path d="M5 12h14"/><path d="M12 5v14"/></svg>`;
-const REFRESH_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${LUCIDE_ATTRS}><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`;
+// Lucide icons (https://lucide.dev) — the app's icon set, rendered via SvgWidget.
+// The app renders the same `circle-plus` / `refresh-cw` via lucide-react-native.
+const lucideSvg = (stroke: string, paths: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+const ADD_ICON = lucideSvg(
+  '#ffffff',
+  '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>'
+);
+const REFRESH_ICON = lucideSvg(
+  '#ffffff',
+  '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'
+);
+const SUN_ICON = lucideSvg(
+  AccentColor,
+  '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'
+);
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
 function DayHeader({ label, palette }: { label: string; palette: Palette }) {
   return (
     <FlexWidget
-      style={{ width: 'match_parent', paddingTop: 8, paddingBottom: 2 }}
+      style={{
+        width: 'match_parent',
+        paddingBottom: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: hex(palette.backgroundSelected),
+      }}
     >
       <TextWidget
         text={label}
         style={{
           fontSize: 12,
           fontFamily: FontFamilyBold,
-          color: hex(palette.textSecondary),
+          color: hex(AccentColor),
         }}
       />
     </FlexWidget>
@@ -73,38 +88,59 @@ function EventRow({
       style={{
         width: 'match_parent',
         flexDirection: 'column',
-        paddingVertical: 3,
-        marginBottom: 6,
       }}
     >
-      <TextWidget
-        text={event.summary || '(untitled)'}
-        maxLines={1}
-        truncate="END"
-        style={{
-          fontSize: 13,
-          fontFamily: FontFamily,
-          color: hex(palette.text),
-        }}
-      />
       {event.allDay ? (
-        <TextWidget
-          text="All day"
-          style={{
-            fontSize: 11,
-            fontFamily: FontFamily,
-            color: hex(AccentColor),
-          }}
-        />
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <SvgWidget
+            svg={SUN_ICON}
+            style={{ width: 14, height: 14, marginRight: 8 }}
+          />
+          <FlexWidget style={{ flex: 1 }}>
+            <TextWidget
+              text={event.summary || '(untitled)'}
+              maxLines={1}
+              truncate="END"
+              style={{
+                fontSize: 14,
+                fontFamily: FontFamily,
+                color: hex(palette.text),
+              }}
+            />
+          </FlexWidget>
+        </FlexWidget>
       ) : (
-        <TextWidget
-          text={toTimeString(new Date(event.start))}
-          style={{
-            fontSize: 11,
-            fontFamily: FontFamily,
-            color: hex(palette.textSecondary),
-          }}
-        />
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TextWidget
+            text={toTimeString(new Date(event.start))}
+            style={{
+              fontSize: 14,
+              fontFamily: FontFamily,
+              color: hex(palette.text),
+            }}
+          />
+          <TextWidget
+            text="•"
+            style={{
+              fontSize: 14,
+              fontFamily: FontFamily,
+              color: hex(palette.text),
+              marginHorizontal: 6,
+            }}
+          />
+          <FlexWidget style={{ flex: 1 }}>
+            <TextWidget
+              text={event.summary || '(untitled)'}
+              maxLines={1}
+              truncate="END"
+              style={{
+                fontSize: 14,
+                fontFamily: FontFamily,
+                color: hex(palette.text),
+              }}
+            />
+          </FlexWidget>
+        </FlexWidget>
       )}
       {event.location ? (
         <TextWidget
@@ -114,10 +150,31 @@ function EventRow({
           style={{
             fontSize: 11,
             fontFamily: FontFamily,
-            color: hex(palette.textSecondary),
+            color: hex(palette.text),
           }}
         />
       ) : null}
+    </FlexWidget>
+  );
+}
+
+/**
+ * Wraps a single day's events (one list item, so they scroll together). Style
+ * this to control spacing around / between a day's events — add `flexGap` for
+ * the gap between events, or `padding*` for room around the group.
+ */
+function EventsWrapper({ children }: { children: ReactNode }) {
+  return (
+    <FlexWidget
+      style={{
+        width: 'match_parent',
+        flexDirection: 'column',
+        paddingTop: 4,
+        paddingBottom: 8,
+        flexGap: 4,
+      }}
+    >
+      {children}
     </FlexWidget>
   );
 }
@@ -158,13 +215,15 @@ function Body({
           label={group.header}
           palette={palette}
         />,
-        ...group.events.map((event) => (
-          <EventRow
-            key={`${event.start}:${event.summary}`}
-            event={event}
-            palette={palette}
-          />
-        )),
+        <EventsWrapper key={`e:${group.day}`}>
+          {group.events.map((event) => (
+            <EventRow
+              key={`${event.start}:${event.summary}`}
+              event={event}
+              palette={palette}
+            />
+          ))}
+        </EventsWrapper>,
       ])}
     </ListWidget>
   );
@@ -188,7 +247,6 @@ function Agenda({
         height: 'match_parent',
         flexDirection: 'column',
         backgroundColor: hex(palette.background),
-        borderRadius: 16,
       }}
     >
       {/* Orange header bar: today's date + freshness on the left, add/refresh right */}
@@ -197,9 +255,7 @@ function Agenda({
           width: 'match_parent',
           flexDirection: 'column',
           backgroundColor: hex(AccentColor),
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
-          paddingHorizontal: 12,
+          paddingHorizontal: 16,
           paddingTop: 10,
           paddingBottom: 8,
         }}
@@ -220,14 +276,14 @@ function Agenda({
             <FlexWidget
               clickAction="OPEN_URI"
               clickActionData={{ uri: `app:///?new=${now.getTime()}` }}
-              style={{ padding: 4 }}
+              style={{ padding: 6 }}
               accessibilityLabel="Add event"
             >
               <SvgWidget svg={ADD_ICON} style={{ width: 20, height: 20 }} />
             </FlexWidget>
             <FlexWidget
               clickAction="REFRESH"
-              style={{ padding: 4 }}
+              style={{ padding: 6, marginLeft: 6 }}
               accessibilityLabel="Refresh events"
             >
               <SvgWidget svg={REFRESH_ICON} style={{ width: 20, height: 20 }} />
@@ -238,10 +294,10 @@ function Agenda({
           <TextWidget
             text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontFamily: FontFamily,
               color: white,
-              marginTop: 2,
+              marginTop: 0,
             }}
           />
         ) : null}
@@ -250,8 +306,8 @@ function Agenda({
         style={{
           width: 'match_parent',
           flex: 1,
-          paddingHorizontal: 12,
-          paddingTop: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
         }}
       >
         <Body cache={cache} now={now} palette={palette} />

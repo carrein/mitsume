@@ -20,7 +20,7 @@ export function HomeScreen() {
   if (isWide) {
     return (
       <ThemedView style={styles.split}>
-        <View style={styles.pane}>
+        <View style={styles.notesPane}>
           <ChatPlaceholder />
         </View>
         <View
@@ -29,7 +29,7 @@ export function HomeScreen() {
             { backgroundColor: theme.backgroundSelected },
           ]}
         />
-        <View style={styles.pane}>
+        <View style={styles.calendarPane}>
           <MonthScreen />
         </View>
       </ThemedView>
@@ -88,7 +88,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
-  pane: {
+  notesPane: {
+    flex: 2,
+  },
+  calendarPane: {
     flex: 1,
   },
   divider: {
@@ -109,6 +112,6 @@ const styles = StyleSheet.create({
   paneButton: {
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: 0,
   },
 });

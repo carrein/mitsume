@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   card: {
-    borderRadius: Spacing.three,
+    borderRadius: 0,
     width: '100%',
     maxWidth: 480,
     maxHeight: '90%',
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   input: {
-    borderRadius: Spacing.two,
+    borderRadius: 0,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     fontSize: 16,
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: AccentColor,
-    borderRadius: Spacing.two,
+    borderRadius: 0,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.two,
   },
