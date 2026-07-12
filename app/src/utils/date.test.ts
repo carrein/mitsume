@@ -1,23 +1,9 @@
-import {
-  eventDays,
-  monthFetchRange,
-  nextFullHour,
-  parseDayTime,
-  toDateString,
-} from './date';
+import { eventDays, nextFullHour, parseDayTime, toDateString } from './date';
 
 describe('toDateString', () => {
   it('formats local dates with zero padding', () => {
     expect(toDateString(new Date(2026, 6, 4))).toBe('2026-07-04');
     expect(toDateString(new Date(2026, 0, 31))).toBe('2026-01-31');
-  });
-});
-
-describe('monthFetchRange', () => {
-  it('pads the month by a week on both sides', () => {
-    const { start, end } = monthFetchRange(new Date(2026, 6, 15));
-    expect(toDateString(start)).toBe('2026-06-24');
-    expect(toDateString(end)).toBe('2026-08-08');
   });
 });
 

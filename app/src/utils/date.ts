@@ -1,6 +1,6 @@
 // Small local-timezone date helpers for the calendar UI (device-local tz per plan).
 
-/** Local date as a react-native-calendars dateString: 'YYYY-MM-DD'. */
+/** Local date as a dateString: 'YYYY-MM-DD'. */
 export function toDateString(d: Date): string {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, '0');
@@ -11,19 +11,6 @@ export function toDateString(d: Date): string {
 /** 'HH:MM' (24h, local). */
 export function toTimeString(d: Date): string {
   return `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
-}
-
-/**
- * Fetch window for a visible month: [1st − 7d, last + 7d). Covers the adjacent-month
- * days shown in the grid without a second request.
- */
-export function monthFetchRange(anyDayInMonth: Date): {
-  start: Date;
-  end: Date;
-} {
-  const y = anyDayInMonth.getFullYear();
-  const m = anyDayInMonth.getMonth();
-  return { start: new Date(y, m, 1 - 7), end: new Date(y, m + 1, 1 + 7) };
 }
 
 /**

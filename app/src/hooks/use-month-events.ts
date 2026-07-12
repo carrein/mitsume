@@ -1,57 +1,154 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { fetchMonth } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
 import { davConfigured } from '@/config';
-import { monthFetchRange } from '@/utils/date';
+import { gridFetchRange } from '@/utils/calendar-grid';
+import { reviveEvents, serializeEvents } from '@/utils/event-snapshot';
+import {
+  applyFetch,
+  applySeed,
+  isFresh,
+  mergeEvents,
+  monthKeyOf,
+  type MonthStore,
+} from '@/utils/month-events-store';
+import { readSnapshot, writeSnapshot } from '@/utils/snapshot-cache';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 /** Poll cadence while the view is actually visible (zero network when hidden). */
 const POLL_VISIBLE_MS = 60_000;
 
+/** A bucket fetched within this window is skipped by prefetch (the poll and
+ *  settle paths still refetch the settled month unconditionally). */
+const PREFETCH_FRESH_MS = POLL_VISIBLE_MS;
+
+/** Prefetch waves around the settled month: ±1 first, then ±2. */
+const PREFETCH_WAVES: readonly (readonly number[])[] = [
+  [-1, 1],
+  [-2, 2],
+];
+
+const cacheKey = (monthKey: string) => `calendar-${monthKey}`;
+
+function monthDelta(
+  year: number,
+  month0: number,
+  delta: number
+): { year: number; month0: number } {
+  const date = new Date(year, month0 + delta, 1);
+  return { year: date.getFullYear(), month0: date.getMonth() };
+}
+
 /**
- * Online-first month window: fetches events for the visible month (± grid overflow)
- * and exposes a manual refresh. A sequence guard drops stale responses when the
- * user pages months faster than the network answers.
+ * Accumulating stale-while-revalidate month store: every month ever fetched
+ * (or seeded from its last-good snapshot) stays in memory, so paging between
+ * months never blanks chips that were already on screen. A settled month
+ * fetches its full 6-row grid viewport (± a week of slack) as before, then
+ * ±1 and ±2 months prefetch in the background — with one-month paging the
+ * destination is always loaded before it can be reached. The server stays
+ * the source of truth: a landed fetch replaces its month's bucket and prunes
+ * server-deleted events from overlapping buckets (see month-events-store);
+ * the cache only ever costs freshness.
  */
 export function useMonthEvents(visibleMonth: Date) {
-  const [events, setEvents] = useState<CalEvent[]>([]);
+  const [store, setStore] = useState<MonthStore<CalEvent>>(() => new Map());
   const [loading, setLoading] = useState(davConfigured);
   const [error, setError] = useState<string | null>(null);
+  // Guards loading/error against out-of-order settled-month fetches; landed
+  // data is always applied (it's authoritative for its own month regardless).
   const seq = useRef(0);
+  const inflight = useRef(new Set<string>());
+  // Mirror for freshness/presence checks from async fetch paths; the checks
+  // tolerate the one-commit lag of an effect-synced ref.
+  const storeRef = useRef(store);
+  useEffect(() => {
+    storeRef.current = store;
+  }, [store]);
 
-  const monthKey = `${visibleMonth.getFullYear()}-${visibleMonth.getMonth()}`;
+  const year = visibleMonth.getFullYear();
+  const month0 = visibleMonth.getMonth();
 
-  const refresh = useCallback(async () => {
-    if (!davConfigured) return;
-    const ticket = ++seq.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const { start, end } = monthFetchRange(visibleMonth);
-      const result = await fetchMonth(start, end);
-      if (seq.current !== ticket) return; // stale response — a newer request is in flight
-      setEvents(result);
-    } catch (err) {
-      if (seq.current !== ticket) return;
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not reach the calendar server'
-      );
-    } finally {
-      if (seq.current === ticket) setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- monthKey stands in for visibleMonth identity
-  }, [monthKey]);
+  const seedFromSnapshot = useCallback((monthKey: string) => {
+    readSnapshot(cacheKey(monthKey)).then((snapshot) => {
+      if (snapshot == null) return;
+      const cached = reviveEvents(snapshot);
+      // applySeed no-ops if a fetch landed while the read was in flight.
+      if (cached) setStore((prev) => applySeed(prev, monthKey, cached));
+    });
+  }, []);
+
+  /** Fetch one month's grid window into its bucket. `primary` (the settled
+   *  month) drives the loading/error UI; prefetches are silent and skipped
+   *  when the bucket is already fresh. */
+  const fetchMonthInto = useCallback(
+    async (y: number, m0: number, primary: boolean) => {
+      if (!davConfigured) return;
+      const monthKey = monthKeyOf(y, m0);
+      if (!primary) {
+        if (inflight.current.has(monthKey)) return;
+        if (isFresh(storeRef.current, monthKey, Date.now(), PREFETCH_FRESH_MS))
+          return;
+      }
+      // Instant paint from the last-good snapshot while the network answers.
+      if (!storeRef.current.has(monthKey)) seedFromSnapshot(monthKey);
+      const ticket = primary ? ++seq.current : 0;
+      if (primary) {
+        setLoading(true);
+        setError(null);
+      }
+      inflight.current.add(monthKey);
+      try {
+        const range = gridFetchRange(y, m0);
+        const result = await fetchMonth(range.start, range.end);
+        setStore((prev) =>
+          applyFetch(prev, monthKey, range, result, Date.now())
+        );
+        writeSnapshot(cacheKey(monthKey), serializeEvents(result));
+      } catch (err) {
+        if (primary && seq.current === ticket) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Could not reach the calendar server'
+          );
+        }
+      } finally {
+        inflight.current.delete(monthKey);
+        if (primary && seq.current === ticket) setLoading(false);
+      }
+    },
+    [seedFromSnapshot]
+  );
+
+  const refresh = useCallback(
+    () => fetchMonthInto(year, month0, true),
+    [fetchMonthInto, year, month0]
+  );
 
   useEffect(() => {
-    // Online-first by design (no cache/store to subscribe to yet): fetching on mount
-    // and on month change IS the synchronization with the external system (Radicale).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-  }, [refresh]);
+    // Fetching on mount and on month change IS the synchronization with the
+    // external system (Radicale); prefetch waves follow so adjacent months are
+    // already in memory when a swipe lands on them. A month change mid-wave
+    // stops further waves (the new settle restarts them re-centered).
+    let cancelled = false;
+    (async () => {
+      await fetchMonthInto(year, month0, true);
+      for (const wave of PREFETCH_WAVES) {
+        if (cancelled) return;
+        await Promise.all(
+          wave.map((delta) => {
+            const target = monthDelta(year, month0, delta);
+            return fetchMonthInto(target.year, target.month0, false);
+          })
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchMonthInto, year, month0]);
 
   useEffect(() => {
     // External writers (Apple Calendar, Etar, another tab) have no push channel
@@ -105,6 +202,8 @@ export function useMonthEvents(visibleMonth: Date) {
       }
     };
   }, [refresh]);
+
+  const events = useMemo(() => mergeEvents(store), [store]);
 
   return { events, loading, error, refresh };
 }

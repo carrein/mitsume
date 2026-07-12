@@ -128,6 +128,25 @@ export default async function seed() {
       start: target(20, 10, 0),
       end: target(20, 11, 0),
     },
+    // 9 covered days (17–25) always cross a week boundary → the grid must
+    // break the banner into ≥2 week segments.
+    {
+      uid: 'e2e-longspan',
+      summary: '🧪 E2E Longspan',
+      start: target(17),
+      end: target(26), // DTEND exclusive
+      allDay: true,
+    },
+    // Ten timed events on one day force the "+N more" overflow at any
+    // plausible slot count. Named "Busy" (not "E2E") so the empty-month
+    // assertion, which matches /🧪 E2E/, ignores them if day 27 bleeds into
+    // the next month's first grid week.
+    ...Array.from({ length: 10 }, (_, i) => ({
+      uid: `e2e-busy-${i + 1}`,
+      summary: `🧪 Busy ${i + 1}`,
+      start: target(27, 8 + i, 0),
+      end: target(27, 8 + i, 45),
+    })),
     // Target + 1 month stays EMPTY (empty-month state).
   ];
 
