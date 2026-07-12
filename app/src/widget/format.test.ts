@@ -48,8 +48,9 @@ describe('groupByDay', () => {
     );
     expect(groups.map((g) => g.day)).toEqual(['2026-07-13', '2026-07-14']);
     expect(groups[0].header).toBe('Mon 13 July');
-    expect(groups[0].events).toHaveLength(2);
-    expect(groups[1].events).toHaveLength(1);
+    expect(groups[0].items).toHaveLength(2);
+    expect(groups[1].items).toHaveLength(1);
+    expect(groups[0].items[0].spanDays).toBe(1);
   });
 
   it('orders all-day before timed within a day', () => {
@@ -60,6 +61,51 @@ describe('groupByDay', () => {
       ],
       now
     );
-    expect(group.events.map((e) => e.summary)).toEqual(['allday', 'timed']);
+    expect(group.items.map((i) => i.event.summary)).toEqual([
+      'allday',
+      'timed',
+    ]);
+  });
+
+  it('expands a multi-day event across every day it covers, with (n/N)', () => {
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 13, 0, 0), {
+          summary: 'trip',
+          allDay: true,
+          end: new Date(2026, 6, 16, 0, 0).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual([
+      '2026-07-13',
+      '2026-07-14',
+      '2026-07-15',
+    ]);
+    expect(groups.map((g) => g.items[0].dayIndex)).toEqual([1, 2, 3]);
+    expect(groups.every((g) => g.items[0].spanDays === 3)).toBe(true);
+  });
+
+  it('drops past days of a running event but keeps true-start indices', () => {
+    // now = Wed 8 Jul; a Mon 6 → Fri 11 (exclusive) event: days 6 & 7 dropped,
+    // dayIndex still counts from the true start (Jul 6).
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 6, 0, 0), {
+          summary: 'vacation',
+          allDay: true,
+          end: new Date(2026, 6, 11, 0, 0).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual([
+      '2026-07-08',
+      '2026-07-09',
+      '2026-07-10',
+    ]);
+    expect(groups.map((g) => g.items[0].dayIndex)).toEqual([3, 4, 5]);
+    expect(groups[0].items[0].spanDays).toBe(5);
   });
 });

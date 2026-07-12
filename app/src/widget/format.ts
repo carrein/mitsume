@@ -1,7 +1,7 @@
 // Day grouping + headings for the agenda widget. Pure — hardcoded English names
 // keep it deterministic across devices (no Intl dependence in the headless
 // context).
-import { parseDay, toDateString } from '@/utils/date';
+import { eventDays, parseDay, toDateString } from '@/utils/date';
 
 import type { WidgetEvent } from './types';
 
@@ -63,38 +63,65 @@ export function dayHeader(d: Date, now: Date): string {
   return base;
 }
 
-/** All-day first, then chronological — matches the in-app agenda ordering. */
-function compareEvents(a: WidgetEvent, b: WidgetEvent): number {
-  if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-  return new Date(a.start).getTime() - new Date(b.start).getTime();
+/** One event's appearance on a single day. `dayIndex`/`spanDays` drive the
+ * `(n/N)` multi-day marker; `dayIndex` counts from the event's true start (so a
+ * still-running event reads e.g. `(2/3)` on its second day). */
+export type WidgetDayItem = {
+  event: WidgetEvent;
+  dayIndex: number;
+  spanDays: number;
+};
+
+/** True all-day, OR a continuation day of a multi-day event — either way it owns
+ * the whole day, so it sorts above timed events. */
+function isAllDayLike(item: WidgetDayItem): boolean {
+  return item.event.allDay || item.dayIndex > 1;
+}
+
+/** All-day/continuation first, then chronological — matches the in-app agenda. */
+function compareItems(a: WidgetDayItem, b: WidgetDayItem): number {
+  const aAll = isAllDayLike(a);
+  const bAll = isAllDayLike(b);
+  if (aAll !== bAll) return aAll ? -1 : 1;
+  return new Date(a.event.start).getTime() - new Date(b.event.start).getTime();
 }
 
 export type WidgetDayGroup = {
-  /** 'YYYY-MM-DD' local day key (the event's start day). */
+  /** 'YYYY-MM-DD' local day key. */
   day: string;
   /** Rendered heading for the group, e.g. 'Mon 13 July'. */
   header: string;
-  events: WidgetEvent[];
+  items: WidgetDayItem[];
 };
 
 /**
- * Bucket already-upcoming events by their local start day: days ascending, and
- * events within a day ordered for display. Multi-day events sit under their
- * start day (same placement the flat list used before grouping).
+ * Bucket upcoming events by local day, expanding multi-day events onto every day
+ * they cover — today onward (past days of a still-running event are dropped, but
+ * its `dayIndex` still counts from the true start). Days ascending; within a day,
+ * all-day/continuation first, then timed by start.
  */
 export function groupByDay(events: WidgetEvent[], now: Date): WidgetDayGroup[] {
-  const byDay = new Map<string, WidgetEvent[]>();
+  const todayKey = toDateString(now);
+  const byDay = new Map<string, WidgetDayItem[]>();
   for (const event of events) {
-    const day = toDateString(new Date(event.start));
-    const list = byDay.get(day);
-    if (list) list.push(event);
-    else byDay.set(day, [event]);
+    const days = eventDays(new Date(event.start), new Date(event.end));
+    days.forEach((day, i) => {
+      if (day < todayKey) return;
+      const item: WidgetDayItem = {
+        event,
+        dayIndex: i + 1,
+        spanDays: days.length,
+      };
+      const list = byDay.get(day);
+      if (list) list.push(item);
+      else byDay.set(day, [item]);
+    });
   }
   return [...byDay.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, dayEvents]) => ({
+    .map(([day, items]) => ({
       day,
       header: dayHeader(parseDay(day) ?? new Date(day), now),
-      events: dayEvents.sort(compareEvents),
+      items: items.sort(compareItems),
     }));
 }

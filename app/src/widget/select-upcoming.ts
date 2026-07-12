@@ -4,7 +4,7 @@ import type { CalEvent } from '@/caldav/types';
 import type { WidgetEvent } from './types';
 
 /** How many events the widget shows. */
-export const UPCOMING_LIMIT = 10;
+export const UPCOMING_LIMIT = 20;
 
 /**
  * The next `limit` events at `now`: anything still in progress or starting

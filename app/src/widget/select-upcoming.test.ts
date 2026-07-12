@@ -1,6 +1,10 @@
 import type { CalEvent } from '@/caldav/types';
 
-import { selectUpcoming, toWidgetEvent } from './select-upcoming';
+import {
+  UPCOMING_LIMIT,
+  selectUpcoming,
+  toWidgetEvent,
+} from './select-upcoming';
 
 function mkEvent(
   summary: string,
@@ -73,14 +77,14 @@ describe('selectUpcoming', () => {
   });
 
   it('caps at the limit, counting each recurring instance separately', () => {
-    const instances = Array.from({ length: 12 }, (_, i) =>
+    const instances = Array.from({ length: UPCOMING_LIMIT + 2 }, (_, i) =>
       mkEvent(
         'standup',
         new Date(2026, 6, 8 + i, 9, 0),
         new Date(2026, 6, 8 + i, 9, 15)
       )
     );
-    expect(selectUpcoming(instances, now)).toHaveLength(10);
+    expect(selectUpcoming(instances, now)).toHaveLength(UPCOMING_LIMIT);
   });
 });
 

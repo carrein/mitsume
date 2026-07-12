@@ -16,21 +16,22 @@ import {
 
 import { davConfigured } from '@/config';
 import {
-  AccentColor,
-  Colors,
-  FontFamily,
-  FontFamilyBold,
-  type ThemeColor,
-} from '@/constants/theme';
-import {
   AddOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
 } from '@/constants/icon-paths';
-import { toDateString, toTimeString } from '@/utils/date';
+import {
+  AccentColor,
+  Colors,
+  FontFamily,
+  FontFamilyBold,
+  OnAccentColor,
+  type ThemeColor,
+} from '@/constants/theme';
+import { toTimeString } from '@/utils/date';
 
-import { groupByDay, headerDate } from './format';
-import type { WidgetCache, WidgetEvent } from './types';
+import { groupByDay, headerDate, type WidgetDayItem } from './format';
+import type { WidgetCache } from './types';
 
 type Palette = Record<ThemeColor, string>;
 
@@ -43,8 +44,8 @@ const hex = (c: string) => c as `#${string}`;
 // Basil bodies are fill-based, so we swap `currentColor` for the actual color.
 const basilSvg = (fill: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
-const ADD_ICON = basilSvg('#ffffff', AddOutlineBody);
-const REFRESH_ICON = basilSvg('#ffffff', RefreshOutlineBody);
+const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
+const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
 const SUN_ICON = basilSvg(AccentColor, SunOutlineBody);
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
@@ -70,15 +71,23 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
   );
 }
 
-/** One event; tapping deep-links the app to this event's day. */
+/**
+ * One event's row for a given day; tapping deep-links the app to that day. A
+ * multi-day event shows a dim `(n/N)` marker and, on continuation days, renders
+ * like an all-day row (sun glyph, no time — it owns the whole day).
+ */
 function EventRow({
-  event,
+  item,
+  day,
   palette,
 }: {
-  event: WidgetEvent;
+  item: WidgetDayItem;
+  day: string;
   palette: Palette;
 }) {
-  const day = toDateString(new Date(event.start));
+  const { event, dayIndex, spanDays } = item;
+  const multiDay = spanDays > 1;
+  const asAllDay = event.allDay || dayIndex > 1;
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -88,59 +97,58 @@ function EventRow({
         flexDirection: 'column',
       }}
     >
-      {event.allDay ? (
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {asAllDay ? (
           <SvgWidget
             svg={SUN_ICON}
             style={{ width: 14, height: 14, marginRight: 8 }}
           />
-          <FlexWidget style={{ flex: 1 }}>
+        ) : (
+          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TextWidget
-              text={event.summary || '(untitled)'}
-              maxLines={1}
-              truncate="END"
+              text={toTimeString(new Date(event.start))}
               style={{
-                fontSize: 14,
+                fontSize: 13,
                 fontFamily: FontFamily,
                 color: hex(palette.text),
               }}
             />
-          </FlexWidget>
-        </FlexWidget>
-      ) : (
-        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TextWidget
-            text={toTimeString(new Date(event.start))}
-            style={{
-              fontSize: 14,
-              fontFamily: FontFamily,
-              color: hex(palette.text),
-            }}
-          />
-          <TextWidget
-            text="•"
-            style={{
-              fontSize: 14,
-              fontFamily: FontFamily,
-              color: hex(palette.text),
-              marginHorizontal: 6,
-            }}
-          />
-          <FlexWidget style={{ flex: 1 }}>
             <TextWidget
-              text={event.summary || '(untitled)'}
-              maxLines={1}
-              truncate="END"
+              text="•"
               style={{
-                fontSize: 14,
+                fontSize: 13,
                 fontFamily: FontFamily,
                 color: hex(palette.text),
+                marginHorizontal: 6,
               }}
             />
           </FlexWidget>
+        )}
+        <FlexWidget style={{ flex: 1 }}>
+          <TextWidget
+            text={event.summary || '(untitled)'}
+            maxLines={1}
+            truncate="END"
+            style={{
+              fontSize: 13,
+              fontFamily: FontFamily,
+              color: hex(palette.text),
+            }}
+          />
         </FlexWidget>
-      )}
-      {event.location ? (
+        {multiDay ? (
+          <TextWidget
+            text={`(${dayIndex}/${spanDays})`}
+            style={{
+              fontSize: 12,
+              fontFamily: FontFamily,
+              color: hex(palette.textSecondary),
+              marginLeft: 6,
+            }}
+          />
+        ) : null}
+      </FlexWidget>
+      {event.location && dayIndex === 1 ? (
         <TextWidget
           text={event.location}
           maxLines={1}
@@ -214,10 +222,11 @@ function Body({
           palette={palette}
         />,
         <EventsWrapper key={`e:${group.day}`}>
-          {group.events.map((event) => (
+          {group.items.map((item) => (
             <EventRow
-              key={`${event.start}:${event.summary}`}
-              event={event}
+              key={`${item.event.start}:${item.event.summary}:${group.day}`}
+              item={item}
+              day={group.day}
               palette={palette}
             />
           ))}
@@ -236,7 +245,7 @@ function Agenda({
   now: Date;
   palette: Palette;
 }) {
-  const white = hex('#ffffff');
+  const onAccent = hex(OnAccentColor);
   return (
     <FlexWidget
       clickAction="OPEN_APP"
@@ -264,7 +273,11 @@ function Agenda({
         <FlexWidget style={{ flexDirection: 'column' }}>
           <TextWidget
             text={headerDate(now)}
-            style={{ fontSize: 20, fontFamily: FontFamilyBold, color: white }}
+            style={{
+              fontSize: 20,
+              fontFamily: FontFamilyBold,
+              color: onAccent,
+            }}
           />
           {cache ? (
             <TextWidget
@@ -272,7 +285,7 @@ function Agenda({
               style={{
                 fontSize: 12,
                 fontFamily: FontFamily,
-                color: white,
+                color: onAccent,
                 marginTop: 0,
               }}
             />
@@ -285,14 +298,14 @@ function Agenda({
             style={{ padding: 6 }}
             accessibilityLabel="Add event"
           >
-            <SvgWidget svg={ADD_ICON} style={{ width: 20, height: 20 }} />
+            <SvgWidget svg={ADD_ICON} style={{ width: 28, height: 28 }} />
           </FlexWidget>
           <FlexWidget
             clickAction="REFRESH"
             style={{ padding: 6, marginLeft: 6 }}
             accessibilityLabel="Refresh events"
           >
-            <SvgWidget svg={REFRESH_ICON} style={{ width: 20, height: 20 }} />
+            <SvgWidget svg={REFRESH_ICON} style={{ width: 28, height: 28 }} />
           </FlexWidget>
         </FlexWidget>
       </FlexWidget>
