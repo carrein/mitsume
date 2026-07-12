@@ -68,7 +68,10 @@
   },
   "private": true,
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^isomorphic-webcrypto/src/react-native$": "<rootDir>/src/shims/lib0-webcrypto.cjs"
+    }
   },
   "patchedDependencies": {
     "react-native-android-widget@0.20.3": "patches/react-native-android-widget@0.20.3.patch"
