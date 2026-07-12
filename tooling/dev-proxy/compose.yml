@@ -1,5 +1,7 @@
-# Local same-origin dev proxy (see Caddyfile header for usage). Official caddy
-# image, no volumes/state — `down` + `docker rmi caddy:2-alpine` reverts fully.
+# Local same-origin dev proxy (see Caddyfile header for usage), plus a local
+# notes backend (sync + blobs, built from server/) so web dev exercises the
+# real sync/blob flow. Dev notes data lives in the named volumes below —
+# `docker compose down -v` wipes it.
 services:
   dev-proxy:
     container_name: mitsume-dev-proxy
@@ -16,3 +18,20 @@ services:
       # Lets the container reach the Mac (Metro on :8081); works on colima and
       # Docker Desktop alike.
       - host.docker.internal:host-gateway
+
+  # Same images the server runs (see server/compose.yml), built locally.
+  mitsume-sync:
+    container_name: mitsume-dev-sync
+    build: ../../server/sync
+    volumes:
+      - dev-sync-data:/data
+
+  mitsume-blobs:
+    container_name: mitsume-dev-blobs
+    build: ../../server/blobs
+    volumes:
+      - dev-blobs-data:/blobs
+
+volumes:
+  dev-sync-data:
+  dev-blobs-data:

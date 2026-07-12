@@ -150,16 +150,33 @@ One JS/TS codebase across Android and web. **User-confirmed 2026-06-09.**
 - Headless ProseMirror with first-class Yjs collaboration and mature Markdown
   serialization. State-of-the-art rich-text-CRDT path in 2026.
 
-### 9.4 Sync server (self-hosted) — y-sweet
-- **y-sweet** (Jamsocket, MIT, Rust) — single Docker container
-  (`ghcr.io/jamsocket/y-sweet`), persists to local disk or any S3-compatible
-  bucket. No proprietary lock-in. Sits behind a TLS reverse proxy.
+### 9.4 Sync server (self-hosted) — Hocuspocus (supersedes y-sweet · 2026-07-11)
+- **Hocuspocus v4** (`@hocuspocus/server`, MIT, Tiptap team) — Node container
+  built from `server/sync/` (`ghcr.io/carrein/mitsume-sync`), persisting
+  whole-document state to a SQLite file on a volume (node:sqlite, no native
+  deps). Authless behind the tailnet, same-origin under the host Caddy at
+  `/sync/*` (see docs/Deploy.md §Notes backend).
+- *Why the change:* the original pick, **y-sweet**, died with Jamsocket
+  (founders joined Modal 2025-07; docs site offline, repo frozen at v0.9.1,
+  bugfix PRs unanswered). Hocuspocus v4 went stable 2026-05 and is actively
+  maintained. Decided 2026-07-11 (decisions log #11).
 
-### 9.5 Blob storage — MinIO (S3-compatible), content-addressed
+### 9.5 Blob storage — content-addressed blob directory (supersedes MinIO · 2026-07-11)
 - Attachments, images, audio, and sketch files are **never stored in the CRDT**.
-- Bytes are hashed (**SHA-256**), stored in **MinIO** keyed by hash (free
-  dedup), and only the **hash + content-type + size** live in the Yjs doc.
-- Blob lifecycle (reference-counting GC) managed independently of CRDT history.
+- Bytes are hashed (**SHA-256**) and stored as **flat hash-named files** served
+  by a Caddy + webdav container built from `server/blobs/`
+  (`ghcr.io/carrein/mitsume-blobs`): `PUT/GET/HEAD/DELETE /blobs/<hash>`, no
+  credentials (tailnet + host Caddy = the boundary), immutable Cache-Control
+  on existing files. Only the **hash + content-type + size** live in the Yjs doc.
+- Pasted canvas images store TWO blobs: the untouched original (future
+  view/export) and a downscaled WebP display rendition (≤2048px long edge)
+  that the canvas renders.
+- Blob deletion is client-refcounted against the doc (bytes removed when the
+  last referencing item is deleted); a server-side GC pass is future work.
+- *Why the change:* **MinIO** open source was feature-stripped in 2025 and the
+  repo archived 2026-04; for single-user content-addressed blobs a plain
+  directory behind the web server is simpler and can't be rug-pulled. Decided
+  2026-07-11 (decisions log #12).
 
 ### 9.6 Local persistence
 - **Web:** `y-indexeddb`.
@@ -209,6 +226,9 @@ One JS/TS codebase across Android and web. **User-confirmed 2026-06-09.**
 | 7 | Encryption revisit | **TLS now; client-side E2E if server leaves trusted net** (§9.10) |
 | 8 | Sketch format | **Vector (point/path JSON)**, optional raster thumb (§9.8) |
 | 9 | Calendar (CalDAV) auth · 2026-07-06 | **Server-side credential injection**: clients (web + Android) store no credentials; the host Caddy injects `Authorization` on `/dav/*` → Radicale. Tailnet reachability = access on that origin (accepted; single-user tailnet — consistent with §9.10 posture). Supersedes the §9.7 token model *for the calendar component only*. |
+| 10 | Notes V1 surface · 2026-07-11 | **Spatial canvas**: the notes pane is a CanvasBar (one icon per canvas) + an infinite pan/zoom 32px-grid canvas holding pasted images (Yjs item model: id/x/y/w/h/z + blob refs). The item model is view-agnostic — a future toggle will render the same items as **list notes** (the §9.3 Tiptap document editor remains the plan for text notes). Server = source of truth; client = y-indexeddb + IndexedDB blob cache with an offline upload queue. |
+| 11 | Sync server · 2026-07-11 | **Hocuspocus v4** replaces the defunct y-sweet (§9.4). Authless behind tailnet at `/sync/*`; SQLite persistence on a volume; images `ghcr.io/carrein/mitsume-sync` built on `v*` tags. |
+| 12 | Blob storage · 2026-07-11 | **Content-addressed blob directory** (Caddy + webdav, `ghcr.io/carrein/mitsume-blobs`) replaces archived MinIO (§9.5). Same-origin `/blobs/<sha256>`, no client credentials, originals + WebP display renditions, client-refcounted deletion. |
 
 ## 11. Summary
 

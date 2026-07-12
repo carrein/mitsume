@@ -1,0 +1,13 @@
+{
+  "name": "mitsume-sync",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@hocuspocus/extension-database": "^4.3.0",
+    "@hocuspocus/server": "^4.3.0"
+  },
+  "devDependencies": {
+    "@hocuspocus/provider": "^4.3.0",
+    "yjs": "^13.6.31"
+  }
+}

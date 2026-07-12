@@ -125,6 +125,64 @@ wrong site block (it must not).
 
 Then run the smoke tests in `.claude/plans/caldav-calendar-plan.md` §Smoke tests.
 
+## Notes backend (sync + blobs)
+
+Two more containers on the same origin (docs/Requirements.md §9.4–9.5,
+decisions #10–12): `mitsume-sync` (Hocuspocus v4, Yjs doc sync over websocket,
+SQLite on a volume) and `mitsume-blobs` (Caddy + webdav, flat SHA-256-named
+image files on a volume). Both are **authless by design** — same posture as
+`/dav/`: tailnet reachability = access, zero client credentials. Images build
+from `server/sync/` and `server/blobs/` on every `v*` tag
+(`.github/workflows/server-images.yml`); Watchtower redeploys.
+
+### 1. Compose services
+
+Merge `server/compose.yml` into the host `docker-compose.yml` (it follows the
+stack's hardening conventions) and add to the server `.env`:
+
+```sh
+MITSUME_SYNC_VOLUME=...   # host dir for the sync SQLite file — uid 1000 writable
+MITSUME_BLOBS_VOLUME=...  # host dir for the image blobs — uid 1000 writable
+```
+
+### 2. Host Caddyfile — add INSIDE the existing mitsume site block, before `handle`
+
+```caddyfile
+	# Notes doc sync (websocket). The client connects to bare /sync (no
+	# trailing slash), which handle_path /sync/* would NOT match — hence the
+	# explicit two-form matcher.
+	@sync path /sync /sync/*
+	handle @sync {
+		uri strip_prefix /sync
+		reverse_proxy mitsume-sync:1234
+	}
+
+	# Image blobs by SHA-256. Immutable Cache-Control is set by the blobs
+	# container itself (only on files that exist — never on 404s).
+	handle_path /blobs/* {
+		request_body {
+			max_size 64MB
+		}
+		reverse_proxy mitsume-blobs:8080
+	}
+```
+
+### 3. Verify after deploy
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' https://<host>:<port>/sync/health   # 200
+H=$(printf 'notes-verify' | shasum -a 256 | cut -d' ' -f1)
+printf 'notes-verify' | curl -s -o /dev/null -w '%{http_code}\n' \
+  -X PUT --data-binary @- https://<host>:<port>/blobs/$H                     # 201
+curl -s https://<host>:<port>/blobs/$H                                       # notes-verify
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE \
+  https://<host>:<port>/blobs/$H                                             # 204
+```
+
+Backup = your existing volume-snapshot routine now also covers
+`MITSUME_SYNC_VOLUME` (one SQLite file) and `MITSUME_BLOBS_VOLUME` (flat
+files; restore = copy back).
+
 ## Android APK
 
 Shipped as its own pipeline: CI builds the APK unsigned, signing + publishing happen
@@ -133,4 +191,6 @@ locally, Obtainium tracks the GitHub Releases feed. Full flow in `docs/Release.m
 ## Local web dev (same-origin without Docker)
 
 Use `tooling/dev-proxy/Caddyfile` (see its header comment):
-Metro on `:8081` + Radicale under `http://localhost:8880/dav/`.
+Metro on `:8081` + Radicale under `http://localhost:8880/dav/`, plus a local
+notes backend (sync + blobs containers built from `server/`) under
+`http://localhost:8880/sync` and `/blobs/`.
