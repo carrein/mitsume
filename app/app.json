@@ -11,7 +11,7 @@
       "package": "com.carrein.mitsume",
       "versionCode": 13,
       "adaptiveIcon": {
-        "backgroundColor": "#FF9500",
+        "backgroundColor": "#FFBD4F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -36,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFBD4F",
           "android": {
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
@@ -50,7 +50,7 @@
             {
               "name": "Agenda",
               "label": "mitsume agenda",
-              "description": "Next 10 upcoming events",
+              "description": "Next 20 upcoming events",
               "minWidth": "250dp",
               "minHeight": "110dp",
               "targetCellWidth": 4,

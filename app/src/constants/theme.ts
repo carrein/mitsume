@@ -73,7 +73,16 @@ export const WideLayoutMinWidth = 768;
 export const FontFamily = 'MonaspaceKrypton';
 export const FontFamilyBold = 'MonaspaceKrypton_bold';
 
-/** Brand accent (matches the app icon). */
-export const AccentColor = '#FF9500';
+/**
+ * Brand accent (matches the app icon). Duplicated in static config that can't
+ * import TS — keep in sync when changing: app.json (adaptiveIcon + splash
+ * backgroundColor) and public/manifest.json (theme_color).
+ */
+// Firefox brand palette (brandcolorcode.com/firefox): orange #FFBD4F,
+// blue #0060E0, yellow #FFEA7F, red #FF505F, pink #E11586, purple #B933E1.
+export const AccentColor = '#FFBD4F';
 /** Destructive actions / validation errors. */
-export const DangerColor = '#B3261E';
+export const DangerColor = '#FF505F';
+/** Text/icons on an accent-colored surface, in both schemes — dark ink, since
+ * the Firefox orange is too light for white to stay readable on it. */
+export const OnAccentColor = '#1C1B22';
