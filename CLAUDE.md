@@ -1,36 +1,42 @@
 # mitsume
 
 Personal, single-user, local-first notes + calendar app. Expo SDK 56 / RN 0.85
-(+ RN Web) client; self-hosted backend (Radicale for calendar today; y-sweet +
-MinIO planned for notes). Targets web + Android (Obtainium) — no iOS.
+(+ RN Web) client; self-hosted backend (Radicale for calendar; Hocuspocus for
+notes doc sync + a content-addressed blob store for pasted images). Targets
+web + Android (Obtainium) — no iOS.
 
 ## Layout
 
 - `app/` — the Expo client (all product code; has its own CLAUDE.md).
 - `docs/` — `Requirements.md` (spec + decisions log), `Deploy.md` (web +
-  same-origin Caddy), `Release.md` (Android APK pipeline).
-- `server/` — stub; y-sweet + MinIO stack not yet scaffolded.
-- `tooling/` — `dev-proxy/` (dockerized same-origin Caddy for web dev),
-  `android-builder/` (local sign + release scripts).
+  same-origin Caddy + notes backend), `Release.md` (Android APK pipeline).
+- `server/` — notes backend: `sync/` (Hocuspocus v4 + SQLite, Node) and
+  `blobs/` (Caddy + webdav, SHA-256-named files); merge-ready `compose.yml`
+  for the host stack (see its README).
+- `tooling/` — `dev-proxy/` (dockerized same-origin Caddy for web dev; also
+  runs the notes backend locally), `android-builder/` (local sign + release
+  scripts).
 - `.claude/plans/` — implementation plans and build logs (historical record).
 
-## Dev loop (bun for everything EXCEPT the local Android/emulator build)
+## Dev loop (bun for scripts/checks; Metro and Gradle run under node)
 
-Bun is the runtime everywhere — web, checks, tests, package installs. The one
-exception is the local Android build (`android:dev`): its Gradle steps shell out
-to real `node`, and bun can't stand in for it, so Node is installed on this
-machine specifically for that build. See the Android bullet below.
+Bun runs checks, tests, and package installs. Metro and the Android build both
+need real node: `--bun` shims node→bun, and bun can't load fsevents (Metro's
+macOS file watcher — edits silently never reach the bundle) or run the Gradle
+helper scripts. See the web and Android bullets below.
 
-- Always `cd app/` first, then `bun run --bun web:proxy` (forces the
-  same-origin `/dav/` URL; plain `web` bakes the tailnet URL from `app/.env`
-  into the bundle and CORS-breaks behind the proxy).
+- Always `cd app/` first, then plain `bun run web:proxy` — NOT `--bun`
+  (breaks file watching → stale bundles; found 2026-07-12). `web:proxy`
+  forces the same-origin `/dav/` URL; plain `web` bakes the tailnet URL from
+  `app/.env` into the bundle and CORS-breaks behind the proxy. Edits then
+  ship on save; only metro.config.js changes need a Metro restart.
 - Web e2e: `tooling/e2e/run.sh` — dockerized Playwright + a throwaway Radicale
   behind its own Caddy on :8881 (never touches the real calendar). Needs Metro
   running (`web:proxy`).
-- Android hot reload: plain `bun run android:dev` — do NOT add `--bun`. Unlike
-  `web:proxy`, this build must use real Node: the Gradle steps shell out to
-  `node` (expo autolinking, entry resolution), and `--bun` shims `node`→bun and
-  breaks the build in ~3s at `settings.gradle` (`command 'node' … exit value 1`).
+- Android hot reload: plain `bun run android:dev` — do NOT add `--bun`. The
+  Gradle steps shell out to `node` (expo autolinking, entry resolution), and
+  `--bun` shims `node`→bun and breaks the build in ~3s at `settings.gradle`
+  (`command 'node' … exit value 1`).
   (debug build under `com.carrein.mitsume.dev`, coexists with the release app;
   needs the local Android SDK — installed 2026-07-07 via Android Studio, env in
   `~/.zshrc`.)
