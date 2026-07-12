@@ -3,7 +3,8 @@ import '@/polyfills';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { VersionBadge } from '@/components/version-badge';
 import { useSilentReload } from '@/hooks/use-silent-reload';
@@ -29,9 +30,19 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Slot />
-      <VersionBadge />
-    </ThemeProvider>
+    // Required by react-native-gesture-handler (canvas pan/pinch) on every
+    // platform, web included — gestures aren't recognized outside this view.
+    <GestureHandlerRootView style={styles.root}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Slot />
+        <VersionBadge />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

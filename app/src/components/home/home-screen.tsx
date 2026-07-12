@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MonthScreen } from '@/components/calendar/month-screen';
-import { ChatPlaceholder } from '@/components/home/chat-placeholder';
+import { NotesScreen } from '@/components/notes/notes-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -21,7 +21,7 @@ export function HomeScreen() {
     return (
       <ThemedView style={styles.split}>
         <View style={styles.notesPane}>
-          <ChatPlaceholder />
+          <NotesScreen />
         </View>
         <View
           style={[
@@ -52,7 +52,7 @@ export function HomeScreen() {
           />
         </View>
       </SafeAreaView>
-      {pane === 'notes' ? <ChatPlaceholder /> : <MonthScreen />}
+      {pane === 'notes' ? <NotesScreen /> : <MonthScreen />}
     </ThemedView>
   );
 }

@@ -1,6 +1,8 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
+import { AccentColor } from '@/constants/theme';
+
 /**
  * Root HTML wrapper for every web route (static export). Runs in Node only —
  * no DOM/browser APIs here. Global CSS and providers belong in _layout.tsx.
@@ -20,7 +22,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="icon" type="image/png" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-        <meta name="theme-color" content="#FF9500" />
+        <meta name="theme-color" content={AccentColor} />
 
         {/*
           Disable body scrolling on web so ScrollView components work as
