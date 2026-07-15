@@ -1,3 +1,6 @@
+diff --git a/node_modules/react-native-android-widget/.bun-tag-4136aebfb846ae94 b/.bun-tag-4136aebfb846ae94
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/node_modules/react-native-android-widget/.bun-tag-8b218605c9a901dc b/.bun-tag-8b218605c9a901dc
 new file mode 100644
 index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
@@ -81,6 +84,26 @@ index 2bdbab9fe634d23e90a4b0b58d591de7745b18c2..ad27ab05bee61693fd1482ce3025b1ef
          Intent intent = new Intent(mContext.getPackageName() + ".WIDGET_CLICK");
          intent.setComponent(new ComponentName(mContext, RNWidgetUtil.getWidgetProviderClassName(mContext, widgetName)));
          intent.putExtra("widgetId", mAppWidgetId);
+diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
+index 647d8f43d744d1e4b6a9c66de2d6a7f6861cbe04..d06b9b0b6e7d4e216967859f4351ed98d29146be 100644
+--- a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
++++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
+@@ -133,6 +133,15 @@ public class RNWidgetProvider extends AppWidgetProvider {
+         try {
+             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++            // mitsume patch: pin URIs this app can handle to this package —
++            // Android ignores per-item setOnClickPendingIntent in collection
++            // widgets, so taps land here via the broadcast template, and an
++            // unpinned app:// deep link opens a chooser (or the wrong app)
++            // when the dev variant is installed alongside the release build.
++            intent.setPackage(context.getPackageName());
++            if (intent.resolveActivity(context.getPackageManager()) == null) {
++                intent.setPackage(null);
++            }
+             context.startActivity(intent);
+         } catch (Exception e) {
+             e.printStackTrace();
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java
 index a057c09736ee40464ca7d9d618079114bdd5518c..fcd56449ab2b36ec2f6af76d87a5058cfe16acb6 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java
