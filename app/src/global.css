@@ -1,14 +1,14 @@
 :root {
-  /* MonaspaceKrypton is registered at runtime by expo-font (useFonts in the root
+  /* Satoshi is registered at runtime by expo-font (useFonts in the root
      layout); the rest are fallbacks until it loads / for emoji. */
   --font-display:
-    MonaspaceKrypton, Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif,
+    Satoshi, Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif,
     Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   --font-mono:
-    MonaspaceKrypton, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    Satoshi, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     Liberation Mono, Courier New, monospace;
   --font-rounded:
-    MonaspaceKrypton, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo,
+    Satoshi, 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo,
     'MS PGothic', sans-serif;
-  --font-serif: MonaspaceKrypton, Georgia, 'Times New Roman', serif;
+  --font-serif: Satoshi, Georgia, 'Times New Roman', serif;
 }

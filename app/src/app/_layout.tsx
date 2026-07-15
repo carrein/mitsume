@@ -12,11 +12,11 @@ import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  // Web loads Monaspace Krypton at runtime (@font-face injection); native embeds
+  // Web loads Satoshi at runtime (@font-face injection); native embeds
   // it via the expo-font config plugin (and the widget reads assets/fonts).
   useFonts({
-    MonaspaceKrypton: require('../../assets/fonts/MonaspaceKrypton.otf'),
-    MonaspaceKrypton_bold: require('../../assets/fonts/MonaspaceKrypton_bold.otf'),
+    Satoshi: require('../../assets/fonts/Satoshi.otf'),
+    Satoshi_bold: require('../../assets/fonts/Satoshi_bold.otf'),
   });
   useSilentReload();
   useEffect(() => {

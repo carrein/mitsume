@@ -28,8 +28,8 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/MonaspaceKrypton.otf",
-            "./assets/fonts/MonaspaceKrypton_bold.otf"
+            "./assets/fonts/Satoshi.otf",
+            "./assets/fonts/Satoshi_bold.otf"
           ]
         }
       ],

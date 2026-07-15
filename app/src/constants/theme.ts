@@ -38,10 +38,10 @@ export const Fonts = Platform.select({
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'MonaspaceKrypton',
-    serif: 'MonaspaceKrypton',
-    rounded: 'MonaspaceKrypton',
-    mono: 'MonaspaceKrypton',
+    sans: 'Satoshi',
+    serif: 'Satoshi',
+    rounded: 'Satoshi',
+    mono: 'Satoshi',
   },
   web: {
     sans: 'var(--font-display)',
@@ -66,12 +66,12 @@ export const MaxContentWidth = 800;
 export const WideLayoutMinWidth = 768;
 
 /**
- * Monaspace Krypton — the app's single typeface (files in assets/fonts). One
- * family name resolves everywhere: RN + web (@font-face), and the RNAW widget,
+ * Satoshi — the app's single typeface (files in assets/fonts). One family
+ * name resolves everywhere: RN + web (@font-face), and the RNAW widget,
  * which loads assets/fonts/<name>.otf by basename. Bold is a separate face.
  */
-export const FontFamily = 'MonaspaceKrypton';
-export const FontFamilyBold = 'MonaspaceKrypton_bold';
+export const FontFamily = 'Satoshi';
+export const FontFamilyBold = 'Satoshi_bold';
 
 /**
  * Brand accent (matches the app icon). Duplicated in static config that can't
