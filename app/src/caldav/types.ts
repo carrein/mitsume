@@ -13,6 +13,14 @@ export type CalEvent = {
   allDay: boolean;
   location?: string;
   description?: string;
+  /** The event's `URL` property (meeting link etc.) — NOT the CalDAV object URL. */
+  link?: string;
+  /** CONFERENCE / X-GOOGLE-CONFERENCE property — a joinable meeting URI. */
+  conference?: string;
+  /** True for occurrences of a recurring series (RRULE / RECURRENCE-ID). */
+  recurring?: boolean;
+  /** True when a reminder is armed (the VEVENT carries a VALARM). */
+  alarm?: boolean;
   /** Original object ICS — required to edit while preserving unknown properties. */
   raw: string;
 };

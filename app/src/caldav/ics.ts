@@ -22,6 +22,10 @@ export function expandEvents(
   const map = (event: any, startTime: any, endTime: any): CalEvent => {
     const vevent = event.component; // the VEVENT ICAL.Component
     const uid: string = event.uid;
+    const link = vevent.getFirstPropertyValue('url');
+    const conference =
+      vevent.getFirstPropertyValue('conference') ??
+      vevent.getFirstPropertyValue('x-google-conference');
     return {
       id: `${uid}:${startTime.toString()}`,
       url,
@@ -33,6 +37,12 @@ export function expandEvents(
       allDay: Boolean(startTime.isDate),
       location: vevent.getFirstPropertyValue('location') ?? undefined,
       description: vevent.getFirstPropertyValue('description') ?? undefined,
+      ...(link ? { link: String(link) } : {}),
+      ...(conference ? { conference: String(conference) } : {}),
+      ...(vevent.hasProperty('rrule') || vevent.hasProperty('recurrence-id')
+        ? { recurring: true }
+        : {}),
+      ...(vevent.getFirstSubcomponent('valarm') ? { alarm: true } : {}),
       raw: ics,
     };
   };

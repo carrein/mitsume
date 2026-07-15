@@ -104,4 +104,59 @@ describe('toWidgetEvent', () => {
     });
     expect('location' in toWidgetEvent(event)).toBe(false);
   });
+
+  it('joins multi-line locations onto one line (Apple venue\\naddress)', () => {
+    const event = mkEvent(
+      'talk',
+      new Date(Date.UTC(2026, 7, 1, 1, 0)),
+      new Date(Date.UTC(2026, 7, 1, 2, 0))
+    );
+    expect(
+      toWidgetEvent({
+        ...event,
+        location:
+          'Singapore Chinese Cultural Centre\n1 Straits Blvd, Singapore 018906',
+      }).location
+    ).toBe(
+      'Singapore Chinese Cultural Centre, 1 Straits Blvd, Singapore 018906'
+    );
+  });
+
+  it('normalizes scheme-less links and keeps recurring only when true', () => {
+    const event = mkEvent(
+      'standup',
+      new Date(Date.UTC(2026, 7, 1, 1, 0)),
+      new Date(Date.UTC(2026, 7, 1, 2, 0))
+    );
+    const bare = toWidgetEvent({ ...event, link: 'google.com' });
+    expect(bare.link).toBe('https://google.com');
+    expect('meetingLink' in bare).toBe(false);
+    const flagged = toWidgetEvent({ ...event, recurring: true, alarm: true });
+    expect(flagged.recurring).toBe(true);
+    expect(flagged.alarm).toBe(true);
+    expect('recurring' in toWidgetEvent(event)).toBe(false);
+    expect('link' in toWidgetEvent(event)).toBe(false);
+    expect('alarm' in toWidgetEvent(event)).toBe(false);
+  });
+
+  it('routes meeting links to meetingLink, without a duplicate link line', () => {
+    const event = mkEvent(
+      'standup',
+      new Date(Date.UTC(2026, 7, 1, 1, 0)),
+      new Date(Date.UTC(2026, 7, 1, 2, 0))
+    );
+    const meeting = toWidgetEvent({
+      ...event,
+      link: 'meet.google.com/abc',
+    });
+    expect(meeting.meetingLink).toBe('https://meet.google.com/abc');
+    expect('link' in meeting).toBe(false);
+    const both = toWidgetEvent({
+      ...event,
+      link: 'https://example.com/agenda',
+      description: 'Join: https://zoom.us/j/9',
+    });
+    expect(both.meetingLink).toBe('https://zoom.us/j/9');
+    expect(both.link).toBe('https://example.com/agenda');
+  });
 });

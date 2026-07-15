@@ -36,9 +36,17 @@ const MONTHS_SHORT = [
   'Dec',
 ] as const;
 
-/** Header date line, e.g. 'Thu • 9 Jul' (local tz). */
+/** Header date line, e.g. 'Thu ▪ 9 Jul' (local tz). */
 export function headerDate(now: Date): string {
-  return `${WEEKDAYS[now.getDay()]} • ${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
+  return `${WEEKDAYS[now.getDay()]} ▪ ${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
+}
+
+/** Display label for an event link — bare host, e.g. 'meet.google.com'. */
+export function linkHost(link: string): string {
+  const stripped = link
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .replace(/^www\./i, '');
+  return stripped.split(/[/?#]/, 1)[0] || link;
 }
 
 function sameLocalDay(a: Date, b: Date): boolean {
@@ -49,18 +57,17 @@ function sameLocalDay(a: Date, b: Date): boolean {
   );
 }
 
-/** Day-group heading — 'Mon 13 July', with a '· Today' / '· Tomorrow' marker
- * on the near days (matches the in-app agenda's day labels). */
+/** Day-group heading — the near days are just 'Today' / 'Tomorrow' (the date
+ * is implied); everything further out spells it out, e.g. 'Mon 13 July'. */
 export function dayHeader(d: Date, now: Date): string {
-  const base = `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  if (sameLocalDay(d, now)) return `${base} · Today`;
+  if (sameLocalDay(d, now)) return 'Today';
   const tomorrow = new Date(
     now.getFullYear(),
     now.getMonth(),
     now.getDate() + 1
   );
-  if (sameLocalDay(d, tomorrow)) return `${base} · Tomorrow`;
-  return base;
+  if (sameLocalDay(d, tomorrow)) return 'Tomorrow';
+  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
 /** One event's appearance on a single day. `dayIndex`/`spanDays` drive the

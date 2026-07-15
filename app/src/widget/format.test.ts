@@ -1,4 +1,4 @@
-import { dayHeader, groupByDay, headerDate } from './format';
+import { dayHeader, groupByDay, headerDate, linkHost } from './format';
 import type { WidgetEvent } from './types';
 
 const ev = (
@@ -15,8 +15,18 @@ const ev = (
 const now = new Date(2026, 6, 8, 12, 0); // Wed 8 Jul 2026, noon
 
 describe('headerDate', () => {
-  it('formats weekday • day short-month', () => {
-    expect(headerDate(new Date(2026, 6, 9, 8, 0))).toBe('Thu • 9 Jul');
+  it('formats weekday ▪ day short-month', () => {
+    expect(headerDate(new Date(2026, 6, 9, 8, 0))).toBe('Thu ▪ 9 Jul');
+  });
+});
+
+describe('linkHost', () => {
+  it('strips scheme, www, and path down to the bare host', () => {
+    expect(linkHost('https://meet.google.com/abc-defg-hij')).toBe(
+      'meet.google.com'
+    );
+    expect(linkHost('https://www.google.com/search?q=x')).toBe('google.com');
+    expect(linkHost('https://zoom.us')).toBe('zoom.us');
   });
 });
 
@@ -26,13 +36,9 @@ describe('dayHeader', () => {
     expect(dayHeader(new Date(2026, 0, 1, 0, 0), now)).toBe('Thu 1 January');
   });
 
-  it('marks today and tomorrow', () => {
-    expect(dayHeader(new Date(2026, 6, 8, 23, 0), now)).toBe(
-      'Wed 8 July · Today'
-    );
-    expect(dayHeader(new Date(2026, 6, 9, 1, 0), now)).toBe(
-      'Thu 9 July · Tomorrow'
-    );
+  it('labels the near days as just Today / Tomorrow', () => {
+    expect(dayHeader(new Date(2026, 6, 8, 23, 0), now)).toBe('Today');
+    expect(dayHeader(new Date(2026, 6, 9, 1, 0), now)).toBe('Tomorrow');
   });
 });
 

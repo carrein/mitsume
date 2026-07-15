@@ -46,7 +46,7 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
             testID="day-popover"
           >
             <ThemedText type="smallBold" style={styles.title}>
-              {dayLabel(day)} · {sorted.length}{' '}
+              {dayLabel(day)} ▪ {sorted.length}{' '}
               {sorted.length === 1 ? 'event' : 'events'}
             </ThemedText>
             <ScrollView contentContainerStyle={styles.list}>

@@ -289,7 +289,7 @@ function WidgetReplica({ palette }: { palette: Palette }) {
     <View style={[styles.widget, { backgroundColor: palette.background }]}>
       <View style={styles.widgetHeader}>
         <View>
-          <Text style={styles.widgetDate}>Fri • 10 Jul</Text>
+          <Text style={styles.widgetDate}>Fri ▪ 10 Jul</Text>
           <Text style={styles.widgetUpdated}>Last Updated: 09:41</Text>
         </View>
         <View style={styles.row}>
@@ -302,7 +302,7 @@ function WidgetReplica({ palette }: { palette: Palette }) {
         </View>
       </View>
       <View style={styles.widgetBody}>
-        <WidgetDayHeader label="Fri 10 July · Today" palette={palette} />
+        <WidgetDayHeader label="Today" palette={palette} />
         <View style={styles.widgetEvents}>
           <View style={styles.row}>
             <SunIcon size={14} color={AccentColor} />
@@ -312,14 +312,14 @@ function WidgetReplica({ palette }: { palette: Palette }) {
           </View>
           <View>
             <Text style={[styles.widgetRowText, { color: palette.text }]}>
-              14:00 • Dentist
+              14:00 ▪ Dentist
             </Text>
             <Text style={[styles.widgetLocation, { color: palette.text }]}>
               Clinic, Level 3
             </Text>
           </View>
         </View>
-        <WidgetDayHeader label="Sat 11 July · Tomorrow" palette={palette} />
+        <WidgetDayHeader label="Tomorrow" palette={palette} />
         <View style={styles.widgetEvents}>
           <View style={styles.row}>
             <SunIcon size={14} color={AccentColor} />

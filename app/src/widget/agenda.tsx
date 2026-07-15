@@ -17,6 +17,7 @@ import {
 import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
+  NotificationOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
 } from '@/constants/icon-paths';
@@ -30,8 +31,8 @@ import {
 } from '@/constants/theme';
 import { toTimeString } from '@/utils/date';
 
-import { groupByDay, headerDate, type WidgetDayItem } from './format';
-import type { WidgetCache } from './types';
+import { groupByDay, headerDate, linkHost, type WidgetDayItem } from './format';
+import type { WidgetCache, WidgetEvent } from './types';
 
 type Palette = Record<ThemeColor, string>;
 
@@ -47,6 +48,26 @@ const basilSvg = (fill: string, body: string) =>
 const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
 const SUN_ICON = basilSvg(AccentColor, SunOutlineBody);
+const ALARM_ICON = basilSvg(AccentColor, NotificationOutlineBody);
+const REPEAT_ICON = basilSvg(AccentColor, RefreshOutlineBody);
+
+// Shared style fragments — the widget's tiny design system. Sizes are plain
+// literals by convention (the widget is its own design surface; see the
+// Spacing note in constants/theme.ts).
+/** Sun / repeat / alarm marker glyph size. */
+const MARKER_ICON = { width: 14, height: 14 } as const;
+/** An event row's primary line — time, dot, title. */
+const rowText = (palette: Palette) => ({
+  fontSize: 13,
+  fontFamily: FontFamily,
+  color: hex(palette.text),
+});
+/** Tappable secondary lines under a row — location, plain link. */
+const linkText = (palette: Palette) => ({
+  fontSize: 11,
+  fontFamily: FontFamily,
+  color: hex(palette.link),
+});
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
 function DayHeader({ label, palette }: { label: string; palette: Palette }) {
@@ -54,7 +75,7 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
     <FlexWidget
       style={{
         width: 'match_parent',
-        paddingBottom: 4,
+        paddingBottom: 5,
         borderBottomWidth: 1,
         borderBottomColor: hex(palette.backgroundSelected),
       }}
@@ -66,6 +87,70 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
           fontFamily: FontFamilyBold,
           color: hex(AccentColor),
         }}
+      />
+    </FlexWidget>
+  );
+}
+
+/**
+ * Status glyphs that follow the row's ▪ dot — repeat, alarm, and any future
+ * markers of that kind live here. Packed tighter than the row's other spacing.
+ * Only rendered when at least one marker applies: RNAW calls components as raw
+ * functions and crashes on a `null` return, so the caller must guard.
+ */
+function StatusIcons({ event }: { event: WidgetEvent }) {
+  const icons = [
+    ...(event.recurring ? [REPEAT_ICON] : []),
+    ...(event.alarm ? [ALARM_ICON] : []),
+  ];
+  return (
+    <FlexWidget
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexGap: 2,
+        marginRight: 4,
+      }}
+    >
+      {icons.map((svg, i) => (
+        <SvgWidget key={i} svg={svg} style={MARKER_ICON} />
+      ))}
+    </FlexWidget>
+  );
+}
+
+/**
+ * Tappable secondary line under an event row (location, plain link). Callers
+ * must guard rendering — RNAW components cannot return null (see StatusIcons).
+ */
+function DetailLine({
+  uri,
+  label,
+  text,
+  palette,
+}: {
+  uri: string;
+  label: string;
+  text: string;
+  palette: Palette;
+}) {
+  return (
+    <FlexWidget
+      clickAction="OPEN_URI"
+      clickActionData={{ uri }}
+      accessibilityLabel={label}
+      style={{
+        width: 'match_parent',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 2,
+      }}
+    >
+      <TextWidget
+        text={text}
+        maxLines={1}
+        truncate="END"
+        style={linkText(palette)}
       />
     </FlexWidget>
   );
@@ -88,6 +173,9 @@ function EventRow({
   const { event, dayIndex, spanDays } = item;
   const multiDay = spanDays > 1;
   const asAllDay = event.allDay || dayIndex > 1;
+  // Markers are cumulative, not either/or. Every row reads
+  // `[time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is the start
+  // time, or the sun for all-day rows; StatusIcons packs what follows the dot.
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -99,41 +187,24 @@ function EventRow({
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
         {asAllDay ? (
-          <SvgWidget
-            svg={SUN_ICON}
-            style={{ width: 14, height: 14, marginRight: 8 }}
-          />
+          <SvgWidget svg={SUN_ICON} style={MARKER_ICON} />
         ) : (
-          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TextWidget
-              text={toTimeString(new Date(event.start))}
-              style={{
-                fontSize: 13,
-                fontFamily: FontFamily,
-                color: hex(palette.text),
-              }}
-            />
-            <TextWidget
-              text="•"
-              style={{
-                fontSize: 13,
-                fontFamily: FontFamily,
-                color: hex(palette.text),
-                marginHorizontal: 6,
-              }}
-            />
-          </FlexWidget>
+          <TextWidget
+            text={toTimeString(new Date(event.start))}
+            style={rowText(palette)}
+          />
         )}
+        <TextWidget
+          text="▪"
+          style={{ ...rowText(palette), marginHorizontal: 6 }}
+        />
+        {event.recurring || event.alarm ? <StatusIcons event={event} /> : null}
         <FlexWidget style={{ flex: 1 }}>
           <TextWidget
             text={event.summary || '(untitled)'}
             maxLines={1}
             truncate="END"
-            style={{
-              fontSize: 13,
-              fontFamily: FontFamily,
-              color: hex(palette.text),
-            }}
+            style={rowText(palette)}
           />
         </FlexWidget>
         {multiDay ? (
@@ -149,15 +220,45 @@ function EventRow({
         ) : null}
       </FlexWidget>
       {event.location && dayIndex === 1 ? (
-        <TextWidget
+        <DetailLine
+          uri={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
+          label="Open location in maps"
           text={event.location}
-          maxLines={1}
-          truncate="END"
+          palette={palette}
+        />
+      ) : null}
+      {event.meetingLink && dayIndex === 1 ? (
+        <FlexWidget
+          clickAction="OPEN_URI"
+          clickActionData={{ uri: event.meetingLink }}
+          accessibilityLabel="Join meeting"
           style={{
-            fontSize: 11,
-            fontFamily: FontFamily,
-            color: hex(palette.text),
+            flexDirection: 'row',
+            marginTop: 3,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            backgroundColor: hex(AccentColor),
+            borderRadius: 4,
           }}
+        >
+          <TextWidget
+            text="Join Meeting"
+            style={{
+              fontSize: 11,
+              fontFamily: FontFamily,
+              color: hex(OnAccentColor),
+            }}
+          />
+        </FlexWidget>
+      ) : null}
+      {event.link && dayIndex === 1 ? (
+        // Only non-meeting URLs land here (meeting links become the Join
+        // chip above), rendered as the bare host.
+        <DetailLine
+          uri={event.link}
+          label="Open event link"
+          text={linkHost(event.link)}
+          palette={palette}
         />
       ) : null}
     </FlexWidget>
@@ -175,9 +276,9 @@ function EventsWrapper({ children }: { children: ReactNode }) {
       style={{
         width: 'match_parent',
         flexDirection: 'column',
-        paddingTop: 4,
-        paddingBottom: 8,
-        flexGap: 4,
+        paddingTop: 5,
+        paddingBottom: 10,
+        flexGap: 5,
       }}
     >
       {children}
@@ -266,15 +367,15 @@ function Agenda({
           alignItems: 'center',
           backgroundColor: hex(AccentColor),
           paddingHorizontal: 16,
-          paddingTop: 10,
+          paddingTop: 8,
           paddingBottom: 8,
         }}
       >
-        <FlexWidget style={{ flexDirection: 'column' }}>
+        <FlexWidget style={{ flexDirection: 'column', flexGap: 4 }}>
           <TextWidget
             text={headerDate(now)}
             style={{
-              fontSize: 20,
+              fontSize: 22,
               fontFamily: FontFamilyBold,
               color: onAccent,
             }}
@@ -283,10 +384,9 @@ function Agenda({
             <TextWidget
               text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
               style={{
-                fontSize: 12,
+                fontSize: 10,
                 fontFamily: FontFamily,
                 color: onAccent,
-                marginTop: 0,
               }}
             />
           ) : null}
@@ -298,14 +398,14 @@ function Agenda({
             style={{ padding: 6 }}
             accessibilityLabel="Add event"
           >
-            <SvgWidget svg={ADD_ICON} style={{ width: 28, height: 28 }} />
+            <SvgWidget svg={ADD_ICON} style={{ width: 24, height: 24 }} />
           </FlexWidget>
           <FlexWidget
             clickAction="REFRESH"
             style={{ padding: 6, marginLeft: 6 }}
             accessibilityLabel="Refresh events"
           >
-            <SvgWidget svg={REFRESH_ICON} style={{ width: 28, height: 28 }} />
+            <SvgWidget svg={REFRESH_ICON} style={{ width: 24, height: 24 }} />
           </FlexWidget>
         </FlexWidget>
       </FlexWidget>
@@ -314,7 +414,8 @@ function Agenda({
           width: 'match_parent',
           flex: 1,
           paddingHorizontal: 16,
-          paddingVertical: 10,
+          paddingTop: 10,
+          paddingBottom: 4,
         }}
       >
         <Body cache={cache} now={now} palette={palette} />

@@ -13,6 +13,15 @@ export type WidgetEvent = {
   end: string;
   allDay: boolean;
   location?: string;
+  /** Non-meeting URL property, normalized to always carry a scheme. */
+  link?: string;
+  /** Joinable meeting URL (CONFERENCE prop, meeting-host URL prop, or a
+   * meeting-host link found in the description) — rendered as a Join chip. */
+  meetingLink?: string;
+  /** Occurrence of a recurring series — rendered as a small repeat marker. */
+  recurring?: boolean;
+  /** A reminder is armed (VALARM present) — rendered as a bell marker. */
+  alarm?: boolean;
 };
 
 /** Last successful fetch, persisted between headless widget runs. */

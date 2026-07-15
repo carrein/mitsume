@@ -1,6 +1,7 @@
 // Pure selection logic for the agenda widget — no tsdav/expo imports.
 import type { CalEvent } from '@/caldav/types';
 
+import { findMeetingLink, normalizeLink } from './meeting-link';
 import type { WidgetEvent } from './types';
 
 /** How many events the widget shows. */
@@ -22,13 +23,30 @@ export function selectUpcoming(
     .slice(0, limit);
 }
 
+/**
+ * Locations arrive multi-line (Apple Calendar writes `venue\naddress`), but the
+ * widget renders them on a single maxLines={1} row — Android ellipsizes at the
+ * first line break regardless of available width, so join the lines instead.
+ */
+function singleLineLocation(location: string): string {
+  return location.replace(/\s*\n+\s*/g, ', ').trim();
+}
+
 /** CalEvent → JSON-safe widget snapshot. */
 export function toWidgetEvent(e: CalEvent): WidgetEvent {
+  // A URL property that IS the meeting link renders only as the Join chip;
+  // any other URL property keeps its own plain link line.
+  const meetingLink = findMeetingLink(e);
+  const plainLink = e.link ? normalizeLink(e.link) : undefined;
   return {
     summary: e.summary,
     start: e.start.toISOString(),
     end: e.end.toISOString(),
     allDay: e.allDay,
-    ...(e.location ? { location: e.location } : {}),
+    ...(e.location ? { location: singleLineLocation(e.location) } : {}),
+    ...(meetingLink ? { meetingLink } : {}),
+    ...(plainLink && plainLink !== meetingLink ? { link: plainLink } : {}),
+    ...(e.recurring ? { recurring: true } : {}),
+    ...(e.alarm ? { alarm: true } : {}),
   };
 }
