@@ -1,5 +1,5 @@
 // Pure math for the scrollable month grid: week indexing over a bounded range
-// (the FlatList data), month-start snap targets, and per-week banner/chip lane
+// (the FlatList data), month-start jump targets, and per-week banner/chip lane
 // layout. No React or react-native imports — runs under bun test and CI jest.
 import { toDateString } from '@/utils/date';
 
@@ -14,21 +14,24 @@ export function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-/** Local-midnight Monday of the week containing `d` (weeks start Monday). */
-export function mondayOf(d: Date): Date {
-  return addDays(d, -((d.getDay() + 6) % 7));
+/** Local-midnight Sunday of the week containing `d` (weeks start Sunday). */
+export function weekStartOf(d: Date): Date {
+  return addDays(d, -d.getDay());
 }
 
 /**
- * Whole weeks between two local-midnight Mondays. Math.round absorbs the ±1h
- * drift a DST transition introduces into the raw ms difference.
+ * Whole weeks between two local-midnight week starts (Sundays). Math.round
+ * absorbs the ±1h drift a DST transition introduces into the raw ms
+ * difference.
  */
-export function weeksBetween(fromMonday: Date, toMonday: Date): number {
-  return Math.round((toMonday.getTime() - fromMonday.getTime()) / WEEK_MS);
+export function weeksBetween(fromWeekStart: Date, toWeekStart: Date): number {
+  return Math.round(
+    (toWeekStart.getTime() - fromWeekStart.getTime()) / WEEK_MS
+  );
 }
 
 /**
- * The bounded week ribbon: Monday dateStrings from the week containing
+ * The bounded week ribbon: Sunday dateStrings from the week containing
  * (today − RANGE_YEARS) through the week containing (today + RANGE_YEARS).
  * The array is the FlatList data; each entry doubles as its key.
  */
@@ -36,14 +39,14 @@ export function buildWeekRange(today: Date): {
   rangeStart: Date;
   weeks: string[];
 } {
-  const rangeStart = mondayOf(
+  const rangeStart = weekStartOf(
     new Date(
       today.getFullYear() - RANGE_YEARS,
       today.getMonth(),
       today.getDate()
     )
   );
-  const rangeEnd = mondayOf(
+  const rangeEnd = weekStartOf(
     new Date(
       today.getFullYear() + RANGE_YEARS,
       today.getMonth(),
@@ -60,10 +63,10 @@ export function buildWeekRange(today: Date): {
 
 /** Row index of the week containing `day` (negative / past-end when out of range). */
 export function weekIndexOfDay(day: Date, rangeStart: Date): number {
-  return weeksBetween(rangeStart, mondayOf(day));
+  return weeksBetween(rangeStart, weekStartOf(day));
 }
 
-/** Row index of the week containing the 1st of (year, month0) — the snap target. */
+/** Row index of the week containing the 1st of (year, month0) — the scrollToMonth target. */
 export function monthStartWeekIndex(
   year: number,
   month0: number,
@@ -72,112 +75,33 @@ export function monthStartWeekIndex(
   return weekIndexOfDay(new Date(year, month0, 1), rangeStart);
 }
 
-/** Every in-range month-start row index, ascending — feeds Android snapToOffsets. */
-export function monthStartWeekIndices(
-  rangeStart: Date,
-  weekCount: number
-): number[] {
-  const endMs = addDays(rangeStart, weekCount * 7).getTime();
-  const indices: number[] = [];
-  let year = rangeStart.getFullYear();
-  let month0 = rangeStart.getMonth();
-  while (new Date(year, month0, 1).getTime() < endMs) {
-    const index = monthStartWeekIndex(year, month0, rangeStart);
-    if (index >= 0 && index < weekCount) indices.push(index);
-    month0 += 1;
-    if (month0 > 11) {
-      month0 = 0;
-      year += 1;
-    }
-  }
-  return indices;
-}
-
 /** A calendar month reference (month0 is 0-based like Date#getMonth). */
 export type MonthAnchor = { year: number; month0: number };
 
-/** Month-start week indices bracketing a pager position (see below). */
-export type MonthNeighbors = { prev: number; current: number; next: number };
-
 /**
- * For a fractional week position (scroll offset ÷ row height), the nearest
- * month-start index plus its neighbors — the pager's clamp window and snap
- * candidates. At the range ends prev/next collapse onto current.
- */
-export function monthStartNeighbors(
-  monthIndices: number[],
-  position: number
-): MonthNeighbors {
-  let lo = 0;
-  let hi = monthIndices.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (monthIndices[mid] < position) lo = mid + 1;
-    else hi = mid;
-  }
-  // lo = first index ≥ position; nearest is that one or its predecessor.
-  if (lo > 0 && position - monthIndices[lo - 1] < monthIndices[lo] - position) {
-    lo -= 1;
-  }
-  return {
-    prev: monthIndices[Math.max(lo - 1, 0)],
-    current: monthIndices[lo],
-    next: monthIndices[Math.min(lo + 1, monthIndices.length - 1)],
-  };
-}
-
-/** Fraction of the way toward an adjacent month a released drag must reach
- *  to commit the page turn (flicks commit regardless). */
-const PAGE_COMMIT_FRACTION = 0.25;
-
-/**
- * Where a released pager drag should land. `flickDirection` +1/−1 is a
- * decisive flick toward later/earlier months — it snaps to the adjacent
- * candidate in that direction (or bounces back to `current` when the drag
- * had strayed the other way); 0 falls back to the commit-fraction rule.
- */
-export function pagerTargetIndex(
-  { prev, current, next }: MonthNeighbors,
-  position: number,
-  flickDirection: -1 | 0 | 1
-): number {
-  const pos = Math.min(Math.max(position, prev), next);
-  if (flickDirection > 0) return pos >= current ? next : current;
-  if (flickDirection < 0) return pos <= current ? prev : current;
-  if (pos >= current) {
-    const span = next - current;
-    return span > 0 && (pos - current) / span > PAGE_COMMIT_FRACTION
-      ? next
-      : current;
-  }
-  const span = current - prev;
-  return span > 0 && (current - pos) / span > PAGE_COMMIT_FRACTION
-    ? prev
-    : current;
-}
-
-/**
- * The month that "owns" a week row = the month of the week's Sunday. With
- * Monday-start weeks, the week containing a month's 1st always has its Sunday
- * in that month, and every following week up to (excluding) the next month's
- * start week does too — so this drives both the header label and day dimming.
+ * The month that "owns" a week row = the month of the week's Saturday. With
+ * Sunday-start weeks, the week containing a month's 1st always has its
+ * Saturday in that month, and every following week up to (excluding) the next
+ * month's start week does too — so this drives both the header label and day
+ * dimming.
  */
 export function monthAnchorOf(weekStart: Date): MonthAnchor {
-  const sunday = addDays(weekStart, 6);
-  return { year: sunday.getFullYear(), month0: sunday.getMonth() };
+  const saturday = addDays(weekStart, 6);
+  return { year: saturday.getFullYear(), month0: saturday.getMonth() };
 }
 
 /**
  * Fetch window covering a settled month's full 6-row viewport:
- * [monday(1st) − 7d, monday(1st) + 49d). Unlike the old [1st−7d, last+7d)
- * window, this covers the 6th grid row even for short months starting on
- * Monday (e.g. Feb 2027 shows through Mar 14 but last+7d ends Mar 8).
+ * [weekStart(1st) − 7d, weekStart(1st) + 49d). Unlike the old
+ * [1st−7d, last+7d) window, this covers the 6th grid row even for short
+ * months starting on Sunday (e.g. Feb 2026 shows through Mar 14 but last+7d
+ * ends Mar 7).
  */
 export function gridFetchRange(
   year: number,
   month0: number
 ): { start: Date; end: Date } {
-  const firstWeek = mondayOf(new Date(year, month0, 1));
+  const firstWeek = weekStartOf(new Date(year, month0, 1));
   return { start: addDays(firstWeek, -7), end: addDays(firstWeek, 49) };
 }
 
@@ -197,6 +121,8 @@ export type BannerPlacement<T extends GridEventLike = GridEventLike> = {
   span: number;
   /** Vertical slot; 0 sits directly under the day-number line. */
   slot: number;
+  /** Consecutive vertical slots occupied (>1 when the title wraps). */
+  rows: number;
   /** Event started before this week — render a squared-off left edge. */
   continuesLeft: boolean;
   continuesRight: boolean;
@@ -206,6 +132,8 @@ export type ChipPlacement<T extends GridEventLike = GridEventLike> = {
   event: T;
   col: number;
   slot: number;
+  /** Consecutive vertical slots occupied (>1 when the title wraps). */
+  span: number;
 };
 
 export type WeekLayout<T extends GridEventLike = GridEventLike> = {
@@ -234,20 +162,26 @@ function dayDiff(weekStart: Date, d: Date): number {
 }
 
 /**
- * Lay out one week row. Banners pack greedily into the lowest free slot
+ * Lay out one week row. Banners pack greedily into the lowest free slot run
  * (sorted startCol asc → span desc → start asc → id, so packing is
- * deterministic); chips then fill per-column gaps under partial banners.
- * With `slotCount` visible slots, an overflowing column hides everything from
- * slot (slotCount − 1) up and reports the hidden count; a banner hidden in any
- * covered column hides row-wide, which can cascade "+N more" into columns that
- * previously fit — the hide pass iterates to a fixpoint. Hidden occupants are
- * not re-packed (an occasional empty slot beats layout jumps). slotCount ≤ 0
- * hides everything; callers only render "+N more" when slotCount ≥ 1.
+ * deterministic); chips then fill per-column gaps under partial banners. Each
+ * banner occupies `bannerRows(event, spanCols)` and each chip
+ * `chipSpan(event)` consecutive slots (default 1 — wrapped titles ask for
+ * more). With `slotCount` visible slots, an
+ * overflowing column hides everything touching slot (slotCount − 1) or below
+ * it and reports the hidden count — a chip that cannot fully fit hides
+ * entirely; a banner hidden in any covered column hides row-wide, which can
+ * cascade "+N more" into columns that previously fit — the hide pass iterates
+ * to a fixpoint. Hidden occupants are not re-packed (an occasional empty slot
+ * beats layout jumps). slotCount ≤ 0 hides everything; callers only render
+ * "+N more" when slotCount ≥ 1.
  */
 export function layoutWeek<T extends GridEventLike>(
   weekStart: Date,
   events: T[],
-  slotCount: number
+  slotCount: number,
+  chipSpan?: (event: T) => number,
+  bannerRows?: (event: T, spanCols: number) => number
 ): WeekLayout<T> {
   const weekStartMs = weekStart.getTime();
   const weekEndMs = addDays(weekStart, 7).getTime();
@@ -262,11 +196,13 @@ export function layoutWeek<T extends GridEventLike>(
       const endDay = dayDiff(weekStart, new Date(lastMs));
       const startCol = Math.max(0, startDay);
       const endCol = Math.min(6, endDay);
+      const span = endCol - startCol + 1;
       banners.push({
         event,
         startCol,
-        span: endCol - startCol + 1,
+        span,
         slot: 0,
+        rows: Math.max(1, bannerRows ? bannerRows(event, span) : 1),
         continuesLeft: startDay < 0,
         continuesRight: endDay > 6,
       });
@@ -286,12 +222,19 @@ export function layoutWeek<T extends GridEventLike>(
 
   // occupied[slot][col]; slots grow unbounded — visibility is applied after.
   const occupied: boolean[][] = [];
-  const freeSlot = (from: number, to: number): number => {
+  const slotFree = (slot: number, from: number, to: number): boolean => {
+    if (slot >= occupied.length) return true;
+    for (let c = from; c <= to; c++) {
+      if (occupied[slot][c]) return false;
+    }
+    return true;
+  };
+  // Lowest slot where `rows` consecutive slots are all free across [from..to].
+  const freeSlotRun = (from: number, to: number, rows: number): number => {
     for (let slot = 0; ; slot++) {
-      if (slot >= occupied.length) return slot;
       let free = true;
-      for (let c = from; c <= to; c++) {
-        if (occupied[slot][c]) {
+      for (let s = slot; s < slot + rows; s++) {
+        if (!slotFree(s, from, to)) {
           free = false;
           break;
         }
@@ -306,9 +249,25 @@ export function layoutWeek<T extends GridEventLike>(
 
   for (const banner of banners) {
     const endCol = banner.startCol + banner.span - 1;
-    banner.slot = freeSlot(banner.startCol, endCol);
-    claim(banner.slot, banner.startCol, endCol);
+    banner.slot = freeSlotRun(banner.startCol, endCol, banner.rows);
+    for (let s = banner.slot; s < banner.slot + banner.rows; s++) {
+      claim(s, banner.startCol, endCol);
+    }
   }
+
+  // Lowest slot where `span` consecutive slots are all free in `col`.
+  const freeRun = (col: number, span: number): number => {
+    for (let slot = 0; ; slot++) {
+      let free = true;
+      for (let s = slot; s < slot + span; s++) {
+        if (s < occupied.length && occupied[s][col]) {
+          free = false;
+          break;
+        }
+      }
+      if (free) return slot;
+    }
+  };
 
   const chips: ChipPlacement<T>[] = [];
   chipsByCol.forEach((list, col) => {
@@ -317,9 +276,10 @@ export function layoutWeek<T extends GridEventLike>(
         a.start.getTime() - b.start.getTime() || a.id.localeCompare(b.id)
     );
     for (const event of list) {
-      const slot = freeSlot(col, col);
-      claim(slot, col, col);
-      chips.push({ event, col, slot });
+      const span = Math.max(1, chipSpan ? chipSpan(event) : 1);
+      const slot = freeRun(col, span);
+      for (let s = slot; s < slot + span; s++) claim(s, col, col);
+      chips.push({ event, col, slot, span });
     }
   });
 
@@ -337,21 +297,26 @@ export function layoutWeek<T extends GridEventLike>(
       const anyHidden =
         colBanners.some((b) => hiddenBanners.has(b)) ||
         colChips.some((chip) => hiddenChips.has(chip));
-      const visibleSlots = [
-        ...colBanners.filter((b) => !hiddenBanners.has(b)),
-        ...colChips.filter((chip) => !hiddenChips.has(chip)),
-      ];
+      // An occupant's bottom slot is (slot + rows/span − 1); it doesn't fit
+      // when that reaches slotCount, and collides with "+N more" at
+      // slotCount − 1.
       const needsMore =
-        anyHidden || visibleSlots.some((p) => p.slot >= slotCount);
+        anyHidden ||
+        colBanners.some(
+          (b) => !hiddenBanners.has(b) && b.slot + b.rows > slotCount
+        ) ||
+        colChips.some(
+          (chip) => !hiddenChips.has(chip) && chip.slot + chip.span > slotCount
+        );
       if (!needsMore) continue;
       for (const b of colBanners) {
-        if (!hiddenBanners.has(b) && b.slot >= slotCount - 1) {
+        if (!hiddenBanners.has(b) && b.slot + b.rows > slotCount - 1) {
           hiddenBanners.add(b);
           changed = true;
         }
       }
       for (const chip of colChips) {
-        if (!hiddenChips.has(chip) && chip.slot >= slotCount - 1) {
+        if (!hiddenChips.has(chip) && chip.slot + chip.span > slotCount - 1) {
           hiddenChips.add(chip);
           changed = true;
         }

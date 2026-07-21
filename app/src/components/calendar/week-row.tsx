@@ -16,9 +16,11 @@ export const SLOT_HEIGHT = 18;
 export const DAY_NUMBER_HEIGHT = 22;
 
 type WeekRowProps = {
-  /** Monday dateString — the row's identity. */
+  /** Week-start (Sunday) dateString — the row's identity. */
   weekStart: string;
   rowHeight: number;
+  /** Day-cell width in px — drives the chip title wrap estimate. */
+  cellWidth: number;
   /** Visible event slots per cell (from row height); ≤0 renders numbers only. */
   slotCount: number;
   /** Events touching this week (pre-bucketed by the grid). */
@@ -35,6 +37,33 @@ type WeekRowProps = {
 
 const pct = (n: number) => `${(n / 7) * 100}%` as const;
 
+// Chip title wrap heuristic: slot layout runs before text renders, so fit is
+// estimated from an averaged glyph width of the 11px title font. A title that
+// fits beside its inline time keeps the one-slot form; an overflowing one
+// takes the stacked form (time line, then the title wrapping to two lines).
+// 11px Satoshi averages ~6px/glyph in mixed case; estimating slightly wide
+// biases borderline titles toward wrapping (an extra slot) instead of
+// ellipsizing, which is the failure users actually notice.
+const CHIP_CHAR_PX = 6.2;
+/** Horizontal chrome inside a chip: 3px bar + 3px gap + 3px right padding. */
+const CHIP_CHROME_PX = 9;
+
+/** Title lines a chip needs against the full cell width (time, when shown,
+ *  sits on its own line and never competes with the title). */
+function chipTitleLines(summary: string, cellWidth: number): number {
+  const title = summary || '(untitled)';
+  return title.length * CHIP_CHAR_PX > cellWidth - CHIP_CHROME_PX ? 2 : 1;
+}
+
+/** Horizontal chrome inside a banner: 4px padding each side + hairline. */
+const BANNER_CHROME_PX = 9;
+
+/** Same glyph-width estimate for banner titles, over the banner's full width. */
+function bannerTitleLines(summary: string, widthPx: number): number {
+  const title = summary || '(untitled)';
+  return title.length * CHIP_CHAR_PX > widthPx - BANNER_CHROME_PX ? 2 : 1;
+}
+
 // Cell washes (translucent, so they read in both themes): weekends get a
 // Firefox-blue tint; days outside the focused month a grey stippling — which
 // takes precedence when a day is both.
@@ -43,6 +72,7 @@ const WEEKEND_TINT = 'rgba(0, 96, 224, 0.08)';
 export const WeekRow = memo(function WeekRow({
   weekStart,
   rowHeight,
+  cellWidth,
   slotCount,
   events,
   todayStr,
@@ -56,14 +86,19 @@ export const WeekRow = memo(function WeekRow({
   const theme = useTheme();
 
   const days = useMemo(() => {
-    const monday = parseDay(weekStart) ?? new Date();
-    return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    const start = parseDay(weekStart) ?? new Date();
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [weekStart]);
 
-  const layout = useMemo(
-    () => layoutWeek(days[0], events, slotCount),
-    [days, events, slotCount]
-  );
+  const layout = useMemo(() => {
+    // With times shown every chip stacks (time line on top), so the span is
+    // the title's lines plus one; without times it's just the title lines.
+    const chipSpan = (event: CalEvent) =>
+      chipTitleLines(event.summary, cellWidth) + (showChipTime ? 1 : 0);
+    const bannerRows = (event: CalEvent, spanCols: number) =>
+      bannerTitleLines(event.summary, spanCols * cellWidth);
+    return layoutWeek(days[0], events, slotCount, chipSpan, bannerRows);
+  }, [days, events, slotCount, cellWidth, showChipTime]);
 
   return (
     <View
@@ -79,7 +114,7 @@ export const WeekRow = memo(function WeekRow({
           const inMonth =
             day.getFullYear() === focusedYear &&
             day.getMonth() === focusedMonth0;
-          const isWeekend = col >= 5; // Monday-start: cols 5/6 = Sat/Sun
+          const isWeekend = col === 0 || col === 6; // Sunday-start: cols 0/6 = Sun/Sat
           const tint = inMonth && isWeekend ? WEEKEND_TINT : undefined;
           const label =
             day.getDate() === 1
@@ -130,13 +165,16 @@ export const WeekRow = memo(function WeekRow({
           <EventBanner
             key={banner.event.id}
             placement={banner}
+            titleLines={banner.rows > 1 ? 2 : 1}
             onPress={() => onPressEvent(banner.event)}
             style={{
               position: 'absolute',
               left: pct(banner.startCol),
-              width: pct(banner.span),
+              // left+right (not width) so the banner's own margins inset its
+              // edges instead of shifting the whole bar sideways.
+              right: pct(7 - banner.startCol - banner.span),
               top: banner.slot * SLOT_HEIGHT,
-              height: SLOT_HEIGHT - 2,
+              height: banner.rows * SLOT_HEIGHT - 2,
             }}
           />
         ))}
@@ -145,13 +183,14 @@ export const WeekRow = memo(function WeekRow({
             key={chip.event.id}
             event={chip.event}
             showTime={showChipTime}
+            titleLines={Math.min(2, showChipTime ? chip.span - 1 : chip.span)}
             onPress={() => onPressEvent(chip.event)}
             style={{
               position: 'absolute',
               left: pct(chip.col),
               width: pct(1),
               top: chip.slot * SLOT_HEIGHT,
-              height: SLOT_HEIGHT - 2,
+              height: chip.span * SLOT_HEIGHT - 2,
             }}
           />
         ))}

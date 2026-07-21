@@ -13,11 +13,10 @@ import {
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewToken,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { CalEvent } from '@/caldav/types';
-import { attachWheelPaging } from '@/components/calendar/wheel-paging';
 import {
   DAY_NUMBER_HEIGHT,
   SLOT_HEIGHT,
@@ -26,13 +25,9 @@ import {
 import {
   buildWeekRange,
   monthAnchorOf,
-  monthStartNeighbors,
   monthStartWeekIndex,
-  monthStartWeekIndices,
-  pagerTargetIndex,
   weekIndexOfDay,
   type MonthAnchor,
-  type MonthNeighbors,
 } from '@/utils/calendar-grid';
 import { parseDay } from '@/utils/date';
 
@@ -55,6 +50,9 @@ type Props = {
   focusedMonth: MonthAnchor;
   onVisibleMonthChange: (anchor: MonthAnchor) => void;
   onSettledMonthChange: (anchor: MonthAnchor) => void;
+  /** Fired once, when the initial month's anchor week first becomes viewable —
+   *  i.e. the grid is verifiably rendering at its landing position. */
+  onAnchored: () => void;
   onPressDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
   onPressMore: (day: string) => void;
@@ -62,38 +60,30 @@ type Props = {
 
 const NO_EVENTS: CalEvent[] = [];
 
-/** Scroll-idle time after which the grid is considered settled on a month.
- *  All scrolling is programmatic now (pager), but the idle timer stays the
- *  one settle mechanism for every input path on both platforms. */
-const SETTLE_MS = 150;
+/** Scroll-idle time after which the grid is considered settled on a month
+ *  (drives the header label handoff, event fetching, and the week snap). */
+const SETTLE_MS = 100;
 
-/** Finger must move this far vertically before the pan claims the gesture
- *  (taps and near-horizontal swipes fall through to day/event presses). */
-const PAN_ACTIVATE_PX = 12;
+/** Duration of the web rAF ease for animated programmatic jumps (Today). */
+const SCROLL_ANIM_MS = 350;
 
-/** Release velocity (px/s) that commits a page turn regardless of distance. */
-const FLICK_VELOCITY = 500;
+/** Duration of the web settle-snap glide onto the nearest week row. */
+const SNAP_ANIM_MS = 180;
 
-/** Rubber-band cap: a drag can overshoot the adjacent-month clamp (or the
- *  range ends) by at most half a row, with asymptotic resistance. */
-const OVERSHOOT_CAP_ROWS = 0.5;
-
-/** Page-turn settle animation; the bounce back from an uncommitted drag. */
-const PAGE_COMMIT_MS = 360;
-const PAGE_BOUNCE_MS = 240;
-
-const easeOutQuint = (t: number) => 1 - Math.pow(1 - t, 5);
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
+/** Any sliver of the anchor week counts; fire without waiting for a gesture. */
+const VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 1,
+  waitForInteraction: false,
+};
+
 /**
- * The month pager: a virtualized FlatList of fixed-height week rows spanning
- * today ± 5 years, with native scrolling DISABLED — a pan gesture (touch and
- * mouse, both platforms) and a wheel handler (web) own the offset instead, so
- * every input pages exactly one month per gesture: drags are hard-clamped to
- * the adjacent months' start rows (rubber-banded at the clamp), release
- * commits past 25% progress or a flick, and an eased rAF animation snaps the
- * target month's first week to the top. Programmatic scrolls feed the same
- * onScroll pipeline as user scrolling did, so month settling is unchanged.
+ * The month grid: a virtualized FlatList of fixed-height week rows spanning
+ * today ± 5 years, scrolled natively — touch, wheel, and trackpad all use the
+ * platform's own scrolling. The header, day dimming, and event fetching
+ * follow whichever week is on top via onScroll; programmatic jumps
+ * (chevrons, Today, deep links) go through scrollToMonth.
  */
 export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   {
@@ -105,6 +95,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     focusedMonth,
     onVisibleMonthChange,
     onSettledMonthChange,
+    onAnchored,
     onPressDay,
     onPressEvent,
     onPressMore,
@@ -129,21 +120,6 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     (index: number) => Math.min(Math.max(index, 0), weeks.length - 1),
     [weeks.length]
   );
-
-  const monthIndices = useMemo(
-    () => monthStartWeekIndices(rangeStart, weeks.length),
-    [rangeStart, weeks.length]
-  );
-
-  // Geometry the gesture/wheel callbacks read at event time — through a ref
-  // because RNGH gestures must stay referentially stable while a gesture runs
-  // (a recreated gesture detaches the active handler mid-drag), so their
-  // callbacks can't close over per-render values.
-  const contentMax = Math.max(0, weeks.length * rowHeight - height);
-  const geometry = useRef({ rowHeight, monthIndices, contentMax });
-  useEffect(() => {
-    geometry.current = { rowHeight, monthIndices, contentMax };
-  }, [rowHeight, monthIndices, contentMax]);
 
   // Bucket events by the weeks they touch; map identity changes per fetch,
   // so mounted rows re-render exactly when data does.
@@ -184,6 +160,37 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const visibleRef = useRef<MonthAnchor>(initialMonth);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Animated programmatic jumps (Today): native uses the platform's animated
+  // scroll, but on web RNW's animated scrollToOffset rides on
+  // element.scroll({behavior:'smooth'}), which silently no-ops in some
+  // embedded/headless Chromium builds — so web animates via rAF steps that
+  // feed the same onScroll pipeline.
+  const animFrame = useRef<number | null>(null);
+
+  const cancelWebScrollAnimation = useCallback(() => {
+    if (animFrame.current != null) {
+      cancelAnimationFrame(animFrame.current);
+      animFrame.current = null;
+    }
+  }, []);
+
+  const animateToOffset = useCallback(
+    (to: number, durationMs: number = SCROLL_ANIM_MS) => {
+      cancelWebScrollAnimation();
+      const from = lastOffset.current;
+      const start = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / durationMs);
+        const offset = from + (to - from) * easeOutCubic(t);
+        lastOffset.current = offset;
+        listRef.current?.scrollToOffset({ offset, animated: false });
+        animFrame.current = t < 1 ? requestAnimationFrame(step) : null;
+      };
+      animFrame.current = requestAnimationFrame(step);
+    },
+    [cancelWebScrollAnimation]
+  );
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offset = e.nativeEvent.contentOffset.y;
     lastOffset.current = offset;
@@ -198,165 +205,77 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     if (settleTimer.current) clearTimeout(settleTimer.current);
     settleTimer.current = setTimeout(() => {
       onSettledMonthChange(anchorAt(lastOffset.current));
+      // Settle-snap (web): ease the rest position onto the nearest week-row
+      // boundary. Native lands there by itself via snapToInterval, and
+      // programmatic jumps already target row multiples, so this no-ops
+      // after them — including after its own glide.
+      if (Platform.OS !== 'web') return;
+      const contentMax = Math.max(0, weeks.length * rowHeight - height);
+      const snapped = Math.min(
+        Math.max(Math.round(lastOffset.current / rowHeight) * rowHeight, 0),
+        contentMax
+      );
+      if (Math.abs(snapped - lastOffset.current) >= 1) {
+        animateToOffset(snapped, SNAP_ANIM_MS);
+      }
     }, SETTLE_MS);
   };
-
-  // All offset animation is rAF-driven instant steps rather than native
-  // animated scrolls: one implementation and one curve on both platforms, an
-  // in-flight signal for wheel-hop chaining (animFrame != null), and it feeds
-  // the same onScroll pipeline either way. (Historically also required on
-  // web: element.scroll({behavior:'smooth'}) silently no-ops in some
-  // embedded/headless Chromium builds.)
-  const animFrame = useRef<number | null>(null);
-  // Where the in-flight animation is heading — a wheel hop landing mid-flight
-  // chains from here (pendingTarget-style), not from the passing offset.
-  const animTarget = useRef(0);
-  const cancelScrollAnimation = useCallback(() => {
-    if (animFrame.current != null) {
-      cancelAnimationFrame(animFrame.current);
-      animFrame.current = null;
-    }
-  }, []);
-
-  const animateScrollTo = useCallback(
-    (to: number, duration: number, ease: (t: number) => number) => {
-      cancelScrollAnimation();
-      animTarget.current = to;
-      const from = lastOffset.current;
-      const start = performance.now();
-      const step = (now: number) => {
-        const t = Math.min(1, (now - start) / duration);
-        const offset = from + (to - from) * ease(t);
-        lastOffset.current = offset;
-        listRef.current?.scrollToOffset({ offset, animated: false });
-        animFrame.current = t < 1 ? requestAnimationFrame(step) : null;
-      };
-      animFrame.current = requestAnimationFrame(step);
-    },
-    [cancelScrollAnimation]
-  );
 
   useEffect(
     () => () => {
       if (settleTimer.current) clearTimeout(settleTimer.current);
-      cancelScrollAnimation();
+      cancelWebScrollAnimation();
     },
-    [cancelScrollAnimation]
+    [cancelWebScrollAnimation]
   );
 
-  // The pager pan. Drags track the finger 1:1 inside [prev month start, next
-  // month start] and rubber-band beyond; release picks prev/current/next via
-  // flick velocity or the 25% commit rule and animates there.
-  const dragRef = useRef<{
-    active: boolean;
-    startOffset: number;
-    window: MonthNeighbors;
-  } | null>(null);
-
-  const panGesture = useMemo(() => {
-    const settleDrag = (velocityY: number) => {
-      const drag = dragRef.current;
-      if (!drag?.active) return;
-      drag.active = false;
-      const { rowHeight: row, contentMax: max } = geometry.current;
-      const direction =
-        velocityY <= -FLICK_VELOCITY ? 1 : velocityY >= FLICK_VELOCITY ? -1 : 0;
-      const target = pagerTargetIndex(
-        drag.window,
-        lastOffset.current / row,
-        direction
-      );
-      const bounce = target === drag.window.current;
-      animateScrollTo(
-        Math.min(Math.max(target * row, 0), max),
-        bounce ? PAGE_BOUNCE_MS : PAGE_COMMIT_MS,
-        bounce ? easeOutCubic : easeOutQuint
-      );
-    };
-
-    return (
-      Gesture.Pan()
-        .runOnJS(true)
-        .activeOffsetY([-PAN_ACTIVATE_PX, PAN_ACTIVATE_PX])
-        .failOffsetX([-2 * PAN_ACTIVATE_PX, 2 * PAN_ACTIVATE_PX])
-        .onStart(() => {
-          cancelScrollAnimation();
-          const { rowHeight: row, monthIndices: indices } = geometry.current;
-          dragRef.current = {
-            active: true,
-            startOffset: lastOffset.current,
-            window: monthStartNeighbors(indices, lastOffset.current / row),
-          };
-        })
-        .onUpdate((e) => {
-          const drag = dragRef.current;
-          if (!drag?.active) return;
-          const { rowHeight: row, contentMax } = geometry.current;
-          const min = Math.max(drag.window.prev * row, 0);
-          const max = Math.min(drag.window.next * row, contentMax);
-          const cap = row * OVERSHOOT_CAP_ROWS;
-          let offset = drag.startOffset - e.translationY;
-          if (offset < min) {
-            const over = min - offset;
-            offset = min - (cap * over) / (over + cap);
-          } else if (offset > max) {
-            const over = offset - max;
-            offset = max + (cap * over) / (over + cap);
-          }
-          lastOffset.current = offset;
-          listRef.current?.scrollToOffset({ offset, animated: false });
-        })
-        .onEnd((e) => settleDrag(e.velocityY))
-        // Cancelled gestures (navigation, another handler stealing) never
-        // reach onEnd — settle with no flick so the grid can't rest off-month.
-        .onFinalize(() => settleDrag(0))
-    );
-  }, [animateScrollTo, cancelScrollAnimation]);
-
-  // Wheel paging (web): native wheel scrolling is already inert
-  // (scrollEnabled=false ⇒ overflow hidden). wheel-gestures segments the raw
-  // stream into gestures (momentum classified by coalescing-tolerant velocity
-  // analysis — see wheel-paging.ts for why hand-rolled per-event heuristics
-  // kept failing here) and the adapter emits at most one hop per gesture; a
-  // re-flick during the momentum tail is a fresh gesture, so rapid flicks
-  // page one month each, even while the settle animation is still in flight
-  // (chaining from its destination).
+  // Anchored latch: report once, the first time the anchor week (the initial
+  // month's first week) is viewable at the landing position — the parent keeps
+  // the grid area covered until then. Viewability recomputes on cell layout
+  // and list updates, not just user scrolls, so this fires shortly after
+  // mount. The callback must keep a stable identity (the list rejects a
+  // changing onViewableItemsChanged), so it reads the moving parts from a ref.
+  const anchoredFired = useRef(false);
+  const anchorContext = useRef<{ week: string; onAnchored: () => void } | null>(
+    null
+  );
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const node = (
-      listRef.current as unknown as {
-        getScrollableNode?: () => unknown;
-      } | null
-    )?.getScrollableNode?.() as HTMLElement | null | undefined;
-    if (!node) return;
-    return attachWheelPaging(node, (direction) => {
-      const {
-        rowHeight: row,
-        monthIndices: indices,
-        contentMax,
-      } = geometry.current;
-      // Mid-animation hops page relative to where the animation will land.
-      const base =
-        animFrame.current != null ? animTarget.current : lastOffset.current;
-      const window = monthStartNeighbors(indices, base / row);
-      const target = direction > 0 ? window.next : window.prev;
-      const to = Math.min(Math.max(target * row, 0), contentMax);
-      if (Math.abs(to - base) < 1) return; // at a range end
-      animateScrollTo(to, PAGE_COMMIT_MS, easeOutQuint);
-    });
-  }, [animateScrollTo]);
+    anchorContext.current = { week: weeks[initialIndex], onAnchored };
+  });
+  const handleViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const ctx = anchorContext.current;
+      if (anchoredFired.current || !ctx) return;
+      if (viewableItems.some((token) => token.key === ctx.week)) {
+        anchoredFired.current = true;
+        ctx.onAnchored();
+      }
+    },
+    []
+  );
 
   // Android hardening: initialScrollIndex can land at 0 in edge cases; one
   // idempotent post-mount jump to the intended offset costs nothing when it
   // already worked.
   const corrected = useRef(false);
+  // A resize re-anchor to re-apply once the list's native content has adopted
+  // the new row height — the resize effect's own scrollToOffset races the
+  // native layout pass and can clamp against the stale content size (see the
+  // resize effect below).
+  const pendingResizeOffset = useRef<number | null>(null);
   const handleContentSizeChange = () => {
-    if (corrected.current) return;
-    corrected.current = true;
-    listRef.current?.scrollToOffset({
-      offset: initialIndex * rowHeight,
-      animated: false,
-    });
+    if (!corrected.current) {
+      corrected.current = true;
+      listRef.current?.scrollToOffset({
+        offset: initialIndex * rowHeight,
+        animated: false,
+      });
+    }
+    const pending = pendingResizeOffset.current;
+    if (pending != null) {
+      pendingResizeOffset.current = null;
+      listRef.current?.scrollToOffset({ offset: pending, animated: false });
+    }
   };
 
   // Pane resize (rotation / window resize): row height changed, so re-anchor
@@ -365,40 +284,76 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   useEffect(() => {
     if (prevRowHeight.current === rowHeight) return;
     prevRowHeight.current = rowHeight;
-    cancelScrollAnimation();
+    cancelWebScrollAnimation();
     const anchor = visibleRef.current;
     const index = clampIndex(
       monthStartWeekIndex(anchor.year, anchor.month0, rangeStart)
     );
     lastOffset.current = index * rowHeight;
+    pendingResizeOffset.current = index * rowHeight;
     listRef.current?.scrollToOffset({
       offset: index * rowHeight,
       animated: false,
     });
-  }, [rowHeight, rangeStart, clampIndex, cancelScrollAnimation]);
+  }, [rowHeight, rangeStart, clampIndex, cancelWebScrollAnimation]);
 
   useImperativeHandle(
     ref,
     () => ({
       scrollToMonth(year, month0, animated) {
         const index = clampIndex(monthStartWeekIndex(year, month0, rangeStart));
-        const offset = Math.min(index * rowHeight, geometry.current.contentMax);
-        if (animated) {
-          animateScrollTo(offset, PAGE_COMMIT_MS, easeOutQuint);
+        const contentMax = Math.max(0, weeks.length * rowHeight - height);
+        const offset = Math.min(index * rowHeight, contentMax);
+        // This jump is the newest intent — a not-yet-applied resize re-anchor
+        // must not later yank the list away from it.
+        pendingResizeOffset.current = null;
+        if (!animated) {
+          cancelWebScrollAnimation();
+          lastOffset.current = offset;
+          listRef.current?.scrollToOffset({ offset, animated: false });
           return;
         }
-        cancelScrollAnimation();
+        // Glide only the final stretch: an animated scroll across a long
+        // distance outruns row mounting and shows white until it settles (and
+        // launched over a stale post-rotation offset, sometimes past it) — so
+        // teleport to within two viewports of the target first.
+        const maxGlide = 2 * height;
+        if (Math.abs(offset - lastOffset.current) > maxGlide) {
+          const jumpTo = Math.min(
+            Math.max(
+              offset - Math.sign(offset - lastOffset.current) * maxGlide,
+              0
+            ),
+            contentMax
+          );
+          lastOffset.current = jumpTo;
+          listRef.current?.scrollToOffset({ offset: jumpTo, animated: false });
+        }
+        if (Platform.OS === 'web') {
+          animateToOffset(offset);
+          return;
+        }
+        cancelWebScrollAnimation();
         lastOffset.current = offset;
-        listRef.current?.scrollToOffset({ offset, animated: false });
+        listRef.current?.scrollToOffset({ offset, animated: true });
       },
     }),
-    [animateScrollTo, cancelScrollAnimation, clampIndex, rangeStart, rowHeight]
+    [
+      clampIndex,
+      rangeStart,
+      rowHeight,
+      weeks.length,
+      height,
+      animateToOffset,
+      cancelWebScrollAnimation,
+    ]
   );
 
   const renderItem = ({ item }: ListRenderItemInfo<string>) => (
     <WeekRow
       weekStart={item}
       rowHeight={rowHeight}
+      cellWidth={width / 7}
       slotCount={slotCount}
       events={weekEvents.get(item) ?? NO_EVENTS}
       todayStr={today}
@@ -412,37 +367,38 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   );
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <FlatList
-        ref={listRef}
-        testID="month-grid"
-        style={styles.list}
-        data={weeks}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemLayout={(_, index) => ({
-          length: rowHeight,
-          offset: rowHeight * index,
-          index,
-        })}
-        initialScrollIndex={initialIndex}
-        initialNumToRender={8}
-        windowSize={7}
-        maxToRenderPerBatch={6}
-        scrollEventThrottle={16}
-        onScroll={handleScroll}
-        onContentSizeChange={handleContentSizeChange}
-        onScrollToIndexFailed={({ index }) => {
-          listRef.current?.scrollToOffset({
-            offset: index * rowHeight,
-            animated: false,
-          });
-        }}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
-        overScrollMode={Platform.OS === 'android' ? 'never' : undefined}
-      />
-    </GestureDetector>
+    <FlatList
+      ref={listRef}
+      testID="month-grid"
+      style={styles.list}
+      data={weeks}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
+      getItemLayout={(_, index) => ({
+        length: rowHeight,
+        offset: rowHeight * index,
+        index,
+      })}
+      initialScrollIndex={initialIndex}
+      initialNumToRender={8}
+      windowSize={7}
+      // Fling momentum is untouched; the platform lands the rest position on
+      // a row multiple. Web ignores this prop — the settle-snap in
+      // handleScroll covers it there.
+      snapToInterval={Platform.OS === 'web' ? undefined : rowHeight}
+      onViewableItemsChanged={handleViewableItemsChanged}
+      viewabilityConfig={VIEWABILITY_CONFIG}
+      scrollEventThrottle={16}
+      onScroll={handleScroll}
+      onContentSizeChange={handleContentSizeChange}
+      onScrollToIndexFailed={({ index }) => {
+        listRef.current?.scrollToOffset({
+          offset: index * rowHeight,
+          animated: false,
+        });
+      }}
+      showsVerticalScrollIndicator={false}
+    />
   );
 });
 

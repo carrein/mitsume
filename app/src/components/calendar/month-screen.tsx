@@ -1,11 +1,18 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
+import { runAlarmReconcile } from '@/alarms/runner';
 import { restoreEvent } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
 import { DayPopover } from '@/components/calendar/day-popover';
@@ -48,11 +55,6 @@ function sameMonth(a: MonthAnchor, b: MonthAnchor): boolean {
   return a.year === b.year && a.month0 === b.month0;
 }
 
-function addMonths(anchor: MonthAnchor, delta: number): MonthAnchor {
-  const date = new Date(anchor.year, anchor.month0 + delta, 1);
-  return { year: date.getFullYear(), month0: date.getMonth() };
-}
-
 export function MonthScreen() {
   const insets = useSafeAreaInsets();
   const today = toDateString(new Date());
@@ -80,15 +82,28 @@ export function MonthScreen() {
   );
   const [snack, setSnack] = useState<Snack>(null);
   const [popoverDay, setPopoverDay] = useState<string | null>(null);
+  // Spins the header's refresh icon — only for button-pressed refreshes, not
+  // the fetches that follow scrolling or the foreground poll.
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [gridSize, setGridSize] = useState<{
     width: number;
     height: number;
   } | null>(null);
+  // The grid can take a few frames (occasionally longer) after mount to be
+  // truly rendering at its landing position — until it reports anchored, a
+  // cover with a spinner sits over the grid area so no half-anchored state
+  // ever paints. Latched: resizes re-anchor instantly and stay uncovered.
+  const [gridAnchored, setGridAnchored] = useState(false);
+  const onGridAnchored = useCallback(() => setGridAnchored(true), []);
+  // Safety valve for environments where viewability callbacks never fire
+  // (e.g. a hidden tab suspending rAF): show the grid regardless after 4s.
+  useEffect(() => {
+    if (gridAnchored) return;
+    const timer = setTimeout(() => setGridAnchored(true), 4000);
+    return () => clearTimeout(timer);
+  }, [gridAnchored]);
 
   const gridRef = useRef<MonthGridHandle>(null);
-  // Chevron target while a scroll animation is in flight — rapid clicks
-  // advance from the last requested month, not the passing visible one.
-  const pendingTarget = useRef<MonthAnchor | null>(null);
 
   // The widget's `+` deep-links `?new=<nonce>`; open the new-event editor (dated
   // today). Cold start seeds it above; a fresh nonce (warm start) re-opens here.
@@ -115,7 +130,6 @@ export function MonthScreen() {
     if (scrolledForDay.current === pendingScrollDay) return;
     scrolledForDay.current = pendingScrollDay;
     const target = monthOfDay(pendingScrollDay, new Date());
-    pendingTarget.current = null;
     gridRef.current?.scrollToMonth(target.year, target.month0, false);
   }, [pendingScrollDay, gridSize]);
 
@@ -137,7 +151,6 @@ export function MonthScreen() {
   }, []);
 
   const onSettledMonthChange = useCallback((anchor: MonthAnchor) => {
-    pendingTarget.current = null;
     setSettledMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
   }, []);
 
@@ -153,16 +166,14 @@ export function MonthScreen() {
 
   const onPressMore = useCallback((day: string) => setPopoverDay(day), []);
 
-  function shiftMonth(delta: number) {
-    const target = addMonths(pendingTarget.current ?? visibleMonth, delta);
-    pendingTarget.current = target;
+  function goToday() {
+    const target = monthOfDay(null, new Date());
     gridRef.current?.scrollToMonth(target.year, target.month0, true);
   }
 
-  function goToday() {
-    pendingTarget.current = null;
-    const target = monthOfDay(null, new Date());
-    gridRef.current?.scrollToMonth(target.year, target.month0, false);
+  function onManualRefresh() {
+    setManualRefreshing(true);
+    refresh().finally(() => setManualRefreshing(false));
   }
 
   function onEditorDone(result: EditorResult) {
@@ -170,8 +181,10 @@ export function MonthScreen() {
     refresh();
     // The home-screen widget has no other way to learn about this mutation
     // (its background cycle is unreliable on aggressive ROMs); foreground
-    // refresh here is the one dependable trigger.
+    // refresh here is the one dependable trigger. Same story for scheduled
+    // alarm notifications.
     refreshAgendaWidget();
+    runAlarmReconcile();
     if (result === 'created') setSnack({ message: 'Event added' });
     else if (result === 'updated') setSnack({ message: 'Saved' });
     else if (result === 'conflict') {
@@ -185,6 +198,7 @@ export function MonthScreen() {
       await restoreEvent(event);
       refresh();
       refreshAgendaWidget();
+      runAlarmReconcile();
     } catch (err) {
       setSnack({
         message: err instanceof Error ? err.message : 'Could not restore event',
@@ -201,9 +215,9 @@ export function MonthScreen() {
 
   const weekdayLabels = useMemo(
     () =>
-      // 2024-01-01 is a Monday; weeks start Monday.
+      // 2024-01-07 is a Sunday; weeks start Sunday.
       Array.from({ length: 7 }, (_, i) =>
-        new Date(2024, 0, 1 + i).toLocaleDateString(undefined, {
+        new Date(2024, 0, 7 + i).toLocaleDateString(undefined, {
           weekday: 'short',
         })
       ),
@@ -244,11 +258,11 @@ export function MonthScreen() {
         <View style={styles.content}>
           <MonthHeader
             label={monthLabel}
+            monthIndex={visibleMonth.year * 12 + visibleMonth.month0}
             loading={loading && events.length === 0}
-            onPrev={() => shiftMonth(-1)}
-            onNext={() => shiftMonth(1)}
+            refreshing={manualRefreshing}
             onToday={goToday}
-            onRefresh={refresh}
+            onRefresh={onManualRefresh}
           />
 
           {error && (
@@ -299,10 +313,16 @@ export function MonthScreen() {
                 focusedMonth={visibleMonth}
                 onVisibleMonthChange={onVisibleMonthChange}
                 onSettledMonthChange={onSettledMonthChange}
+                onAnchored={onGridAnchored}
                 onPressDay={onPressDay}
                 onPressEvent={onPressEvent}
                 onPressMore={onPressMore}
               />
+            )}
+            {(!gridAnchored || !gridSize) && (
+              <ThemedView style={styles.gridCover}>
+                <ActivityIndicator size="large" color={AccentColor} />
+              </ThemedView>
             )}
           </View>
         </View>
@@ -389,15 +409,28 @@ const styles = StyleSheet.create({
   weekdays: {
     flexDirection: 'row',
     paddingBottom: Spacing.one,
+    borderBottomWidth: 1,
+    borderBottomColor: AccentColor,
   },
   weekday: {
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'right',
+    paddingRight: Spacing.three,
     fontSize: 12,
     color: Colors.light.text,
+    fontWeight: 'bold',
   },
   gridWrap: {
     flex: 1,
+  },
+  gridCover: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   snackWrapper: {
     position: 'absolute',

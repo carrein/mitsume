@@ -1,6 +1,13 @@
 # Wheel Paging via wheel-gestures — Implementation Plan
 Created: 2026-07-13
-Status: COMPLETE (pending user trackpad tuning loop)
+Status: REMOVED 2026-07-19 — the custom scroll model (this pager and the
+uncommitted wheel-scroll live-scroll rework that followed it) never felt
+right in the tuning loop. All custom wheel/pan scrolling was stripped: the
+month grid now scrolls as a plain native FlatList (scrollEnabled default,
+no GestureDetector, no wheel adapter, `wheel-gestures` dependency dropped).
+Chevrons/Today/deep links still jump via scrollToMonth; the header and
+event fetching follow onScroll as before. The wheel-scroll rework is
+preserved in `git stash` ("wheel-scroll rework (pre-revert backup)").
 
 ## Context
 

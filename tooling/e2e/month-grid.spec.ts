@@ -2,8 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Month-grid e2e: drives the real web app (Metro on the host) against the
 // throwaway Radicale seeded by seed.mjs. Dates mirror seed.mjs: fixtures live
-// in the current month and current month + 3. Navigation uses the header
-// chevrons/Today button — deterministic, unlike scroll gestures.
+// in the current month and current month + 3. Navigation uses `?day=` deep
+// links and the header label (tap → today) — deterministic, unlike scroll
+// gestures.
 
 const pad = (n: number) => `${n}`.padStart(2, '0');
 const dateString = (d: Date) =>
@@ -14,23 +15,31 @@ const monthTitle = (d: Date) =>
 const now = new Date();
 const target = (day: number) =>
   new Date(now.getFullYear(), now.getMonth() + 3, day);
-/** Local-midnight Monday of the week containing d (grid weeks start Monday). */
-const mondayOf = (d: Date) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+/** Local-midnight Sunday of the week containing d (grid weeks start Sunday). */
+const sundayOf = (d: Date) =>
+  new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
 
 async function shot(page: Page, name: string) {
   await page.screenshot({ path: `artifacts/${name}.png`, fullPage: true });
 }
 
 async function cancelEditor(page: Page) {
-  await page.getByText('Cancel', { exact: true }).click();
-  await expect(page.getByText('New event')).toHaveCount(0);
-  await expect(page.getByText('Edit event')).toHaveCount(0);
+  await page.getByTestId('editor-cancel').click();
+  await expect(page.getByTestId('event-editor')).toHaveCount(0);
 }
 
-// Editor fields by tab order: 0 = Title, 1 = Date (only the editor's inputs
-// exist while the modal is open).
-const editorInput = (page: Page, n: number) => page.getByRole('textbox').nth(n);
+/** The editor title is the start date in the PAGE's locale — compute it there. */
+async function editorTitleFor(page: Page, day: string) {
+  return page.evaluate(
+    (d: string) =>
+      new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      }),
+    day
+  );
+}
 
 test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   await test.step('initial load: current month, today chip visible', async () => {
@@ -45,12 +54,11 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await shot(page, '01-initial-today');
   });
 
-  await test.step('chevron ×3 → target month, first week snapped to top', async () => {
-    for (let i = 0; i < 3; i++) {
-      await page.getByTestId('calendar-next').click();
-    }
+  await test.step('deep link → target month, first week snapped to top', async () => {
+    await page.goto(`/?day=${dateString(target(1))}`);
     await expect(page.getByTestId('calendar-header-label')).toHaveText(
-      monthTitle(target(1))
+      monthTitle(target(1)),
+      { timeout: 30_000 }
     );
     await expect(page.getByText('🧪 E2E Morning')).toBeVisible({
       timeout: 30_000,
@@ -59,7 +67,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     // The week containing the 1st settles at the grid's top edge.
     const gridBox = await page.getByTestId('month-grid').boundingBox();
     const firstWeekCell = page.getByTestId(
-      `day-cell-${dateString(mondayOf(target(1)))}`
+      `day-cell-${dateString(sundayOf(target(1)))}`
     );
     await expect
       .poll(async () => {
@@ -109,40 +117,75 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
     await popover.getByText('🧪 Busy 5').click();
-    await expect(page.getByText('Edit event')).toBeVisible();
-    await expect(editorInput(page, 0)).toHaveValue('🧪 Busy 5');
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('editor-summary')).toHaveValue('🧪 Busy 5');
+    await expect(page.getByTestId('editor-title')).toHaveText(
+      await editorTitleFor(page, dateString(target(27)))
+    );
     await shot(page, '04-popover-edit');
     await cancelEditor(page);
   });
 
   await test.step('empty day tap → create editor dated that day', async () => {
     await page.getByTestId(`day-cell-${dateString(target(15))}`).click();
-    await expect(page.getByText('New event')).toBeVisible();
-    await expect(editorInput(page, 1)).toHaveValue(dateString(target(15)));
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+    // Native date input: value is locale-independent ISO.
+    await expect(page.getByTestId('editor-start-date')).toHaveValue(
+      dateString(target(15))
+    );
+    await expect(page.getByTestId('editor-title')).toHaveText(
+      await editorTitleFor(page, dateString(target(15)))
+    );
     await shot(page, '05-day-tap-create');
     await cancelEditor(page);
   });
 
   await test.step('chip tap → edit editor', async () => {
     await page.getByText('🧪 E2E Morning').click();
-    await expect(page.getByText('Edit event')).toBeVisible();
-    await expect(editorInput(page, 0)).toHaveValue('🧪 E2E Morning');
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('editor-summary')).toHaveValue(
+      '🧪 E2E Morning'
+    );
     await shot(page, '06-chip-tap-edit');
     await cancelEditor(page);
   });
 
+  await test.step('recurring create → daily ×3 → chips on three days → delete series', async () => {
+    await page.getByTestId(`day-cell-${dateString(target(15))}`).click();
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await page.getByTestId('editor-summary').fill('🧪 E2E Recurring');
+    await page.getByTestId('editor-repeat-preset-daily').click();
+    await page.getByTestId('editor-repeat-end-count').click();
+    await page.getByTestId('editor-repeat-count').fill('3');
+    await page.getByTestId('editor-save').click();
+    await expect(page.getByTestId('event-editor')).toHaveCount(0);
+    // One occurrence chip on each of the three days.
+    await expect(page.getByText('🧪 E2E Recurring')).toHaveCount(3, {
+      timeout: 30_000,
+    });
+    await shot(page, '06b-recurring-chips');
+
+    // Whole-series delete from any occurrence.
+    await page.getByText('🧪 E2E Recurring').nth(1).click();
+    await expect(page.getByTestId('editor-delete')).toHaveText('Delete series');
+    await page.getByTestId('editor-delete').click();
+    await expect(page.getByText('🧪 E2E Recurring')).toHaveCount(0, {
+      timeout: 30_000,
+    });
+  });
+
   await test.step('next month is empty', async () => {
-    await page.getByTestId('calendar-next').click();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 4, 1);
+    await page.goto(`/?day=${dateString(nextMonth)}`);
     await expect(page.getByTestId('calendar-header-label')).toHaveText(
-      monthTitle(nextMonth)
+      monthTitle(nextMonth),
+      { timeout: 30_000 }
     );
     // Seeded "E2E" events end by target(25) and can't reach this month's first
     // grid week; the day-27 "Busy" fixtures are deliberately excluded from
-    // this match since that week can start as early as the 26th. Events stay
-    // loaded across months now, so mounted off-viewport rows of the previous
-    // month legitimately keep their chips in the DOM — "empty" means no
-    // fixture intersects the grid viewport.
+    // this match since that week can start as early as the 26th. Rows mounted
+    // outside the viewport may still hold prior-month chips in the DOM —
+    // "empty" means no fixture intersects the grid viewport.
     const gridBox = await page.getByTestId('month-grid').boundingBox();
     const fixtures = page.getByText(/🧪 E2E/);
     await expect
@@ -192,8 +235,40 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await shot(page, '09-deeplink-day');
 
     await page.goto('/?new=e2e-nonce');
-    await expect(page.getByText('New event')).toBeVisible({ timeout: 30_000 });
-    await expect(editorInput(page, 1)).toHaveValue(dateString(now));
+    await expect(page.getByTestId('event-editor')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('editor-start-date')).toHaveValue(
+      dateString(now)
+    );
     await shot(page, '10-deeplink-new');
+    await cancelEditor(page);
+  });
+
+  await test.step('narrow default: editor is a bottom sheet hugging the bottom edge', async () => {
+    await page.goto('/?new=e2e-sheet-nonce');
+    const editor = page.getByTestId('event-editor');
+    await expect(editor).toBeVisible({ timeout: 30_000 });
+    const box = await editor.boundingBox();
+    const viewport = page.viewportSize()!;
+    expect(box!.y + box!.height).toBeGreaterThan(viewport.height - 80);
+    await shot(page, '11-narrow-sheet');
+    await cancelEditor(page);
+  });
+
+  await test.step('wide viewport: editor is the centered dialog', async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/?new=e2e-dialog-nonce');
+    const editor = page.getByTestId('event-editor');
+    await expect(editor).toBeVisible({ timeout: 30_000 });
+    // Dialog, not sheet: capped at maxWidth 480 and vertically centered.
+    const box = await editor.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(500);
+    expect(box!.y).toBeGreaterThan(20);
+    await expect(page.getByTestId('editor-title')).toHaveText(
+      await editorTitleFor(page, dateString(now))
+    );
+    await shot(page, '12-wide-dialog');
+    await cancelEditor(page);
   });
 });

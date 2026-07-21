@@ -30,7 +30,9 @@ const PREFETCH_WAVES: readonly (readonly number[])[] = [
   [-2, 2],
 ];
 
-const cacheKey = (monthKey: string) => `calendar-${monthKey}`;
+/** Snapshot-cache key for a month bucket — shared with the alarm runner's
+ * cold-start fallback (src/alarms/runner.ts). */
+export const cacheKey = (monthKey: string) => `calendar-${monthKey}`;
 
 function monthDelta(
   year: number,
