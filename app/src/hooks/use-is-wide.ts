@@ -1,9 +1,7 @@
-import { useSyncExternalStore } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import { WideLayoutMinWidth } from '@/constants/theme';
-
-const emptySubscribe = () => () => {};
+import { useHydrated } from '@/hooks/use-hydrated';
 
 /**
  * Whether the window is wide enough for the side-by-side layout. Reports
@@ -11,12 +9,7 @@ const emptySubscribe = () => () => {};
  * HTML (same pattern as use-color-scheme.web.ts).
  */
 export function useIsWide() {
-  const hasHydrated = useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  );
-
+  const hasHydrated = useHydrated();
   const { width } = useWindowDimensions();
 
   return hasHydrated && width >= WideLayoutMinWidth;
