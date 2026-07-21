@@ -64,3 +64,19 @@ export function nextFullHour(from: Date): Date {
   d.setHours(d.getHours() + 1);
   return d;
 }
+
+/** Human day heading, e.g. 'Fri, 10 Jul' (editor title, day popover). */
+export function dayLabel(day: string): string {
+  return (parseDay(day) ?? new Date()).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+/** dateString shifted by n days (local). */
+export function addDays(day: string, n: number): string {
+  const d = parseDay(day) ?? new Date();
+  d.setDate(d.getDate() + n);
+  return toDateString(d);
+}

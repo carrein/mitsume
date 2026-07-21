@@ -22,3 +22,18 @@ if (typeof g.TextDecoder === 'undefined') g.TextDecoder = TextDecoderPolyfill;
 const cryptoLike = (g.crypto ?? (g.crypto = {})) as Record<string, unknown>;
 if (typeof cryptoLike.getRandomValues === 'undefined')
   cryptoLike.getRandomValues = getRandomValues;
+
+// crypto.randomUUID (event UIDs, via expo-crypto on web) is secure-context-only
+// in browsers — absent behind a plain-HTTP proxy (e2e, bare tailnet). RFC 4122
+// v4 from getRandomValues is the same entropy without the context restriction.
+if (typeof cryptoLike.randomUUID === 'undefined')
+  cryptoLike.randomUUID = () => {
+    const bytes = new Uint8Array(16);
+    (cryptoLike.getRandomValues as (a: Uint8Array) => Uint8Array)(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(
+      ''
+    );
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  };

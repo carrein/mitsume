@@ -13,6 +13,7 @@ import { AddIcon, RefreshIcon, SunIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import {
   AccentColor,
+  BrandColor,
   Colors,
   DangerColor,
   FontFamily,
@@ -33,6 +34,7 @@ const PaletteTokens = Object.keys(Colors.light) as ThemeColor[];
 
 const BrandConstants = [
   { name: 'AccentColor', value: AccentColor },
+  { name: 'BrandColor', value: BrandColor },
   { name: 'DangerColor', value: DangerColor },
   { name: 'OnAccentColor', value: OnAccentColor },
 ] as const;

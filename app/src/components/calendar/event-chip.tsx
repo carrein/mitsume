@@ -8,38 +8,78 @@ import {
 
 import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, OnAccentColor, Spacing } from '@/constants/theme';
+import { AccentColor, Spacing } from '@/constants/theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
+import { readableTextColor } from '@/utils/color';
 import { toTimeString } from '@/utils/date';
 
 type ChipProps = {
   event: CalEvent;
-  /** Right-aligned start time — only when cells are wide enough to afford it. */
+  /** Show the start time — only when cells are wide enough to afford it. */
   showTime: boolean;
+  /** Title lines the layout granted this chip; >1 renders the stacked form. */
+  titleLines: number;
   /** Absolute slot position, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
   onPress: () => void;
 };
 
-/** A single-day timed event inside a day cell: accent bar + truncated title. */
-export function EventChip({ event, showTime, style, onPress }: ChipProps) {
+/**
+ * A single-day timed event inside a day cell: accent bar + content. With the
+ * time shown it always stacks — time on its own line, title under it wrapping
+ * to the granted lines. Without a time it's the title alone, wrapping only
+ * when granted extra lines.
+ */
+export function EventChip({
+  event,
+  showTime,
+  titleLines,
+  style,
+  onPress,
+}: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
       style={[styles.chip, style]}
       testID={`chip-${event.id}`}
     >
-      <View style={styles.chipBar} />
-      <ThemedText type="small" numberOfLines={1} style={styles.chipTitle}>
-        {event.summary || '(untitled)'}
-      </ThemedText>
-      {showTime && (
-        <ThemedText
-          type="small"
-          themeColor="textSecondary"
-          style={styles.chipTime}
-        >
-          {toTimeString(event.start)}
+      {/* Accent bar tinted by the source calendar (falls back to the theme accent). */}
+      <View
+        style={[
+          styles.chipBar,
+          { backgroundColor: event.color ?? AccentColor },
+        ]}
+      />
+      {showTime ? (
+        <View style={styles.chipStack}>
+          <ThemedText
+            type="small"
+            themeColor="textSecondary"
+            style={styles.chipTime}
+          >
+            {toTimeString(event.start)}
+          </ThemedText>
+          <ThemedText
+            type="small"
+            numberOfLines={titleLines}
+            style={styles.chipTitleWrapped}
+          >
+            {event.summary || '(untitled)'}
+          </ThemedText>
+        </View>
+      ) : titleLines > 1 ? (
+        <View style={styles.chipStack}>
+          <ThemedText
+            type="small"
+            numberOfLines={titleLines}
+            style={styles.chipTitleWrapped}
+          >
+            {event.summary || '(untitled)'}
+          </ThemedText>
+        </View>
+      ) : (
+        <ThemedText type="small" numberOfLines={1} style={styles.chipTitle}>
+          {event.summary || '(untitled)'}
         </ThemedText>
       )}
     </Pressable>
@@ -48,28 +88,43 @@ export function EventChip({ event, showTime, style, onPress }: ChipProps) {
 
 type BannerProps = {
   placement: BannerPlacement<CalEvent>;
-  /** Absolute slot position + horizontal span, supplied by the week row. */
+  /** Title lines the layout granted this banner (>1 when it wraps). */
+  titleLines: number;
+  /** Absolute slot position + horizontal extent, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
   onPress: () => void;
 };
 
 /**
  * An all-day/multi-day event drawn as one filled bar across its covered day
- * cells. A week edge the event continues past renders squared-off.
+ * cells — flush left, inset a hairline on the right so the end cell's border
+ * stays visible. Past a week edge the event continues over, it bleeds to the
+ * pane edge instead.
  */
-export function EventBanner({ placement, style, onPress }: BannerProps) {
-  const { event, continuesLeft, continuesRight } = placement;
+export function EventBanner({
+  placement,
+  titleLines,
+  style,
+  onPress,
+}: BannerProps) {
+  const { event, continuesRight } = placement;
+  // Fill by source calendar; title contrasts against whatever that fill is.
+  const fill = event.color ?? AccentColor;
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.banner,
-        continuesLeft && styles.bannerContinuesLeft,
+        { backgroundColor: fill },
         continuesRight && styles.bannerContinuesRight,
         style,
       ]}
     >
-      <ThemedText type="small" numberOfLines={1} style={styles.bannerTitle}>
+      <ThemedText
+        type="small"
+        numberOfLines={titleLines}
+        style={[styles.bannerTitle, { color: readableTextColor(fill) }]}
+      >
         {event.summary || '(untitled)'}
       </ThemedText>
     </Pressable>
@@ -81,19 +136,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    paddingLeft: 2,
     paddingRight: 3,
-    borderRadius: Spacing.one,
   },
   chipBar: {
     width: 3,
-    borderRadius: 1,
     alignSelf: 'stretch',
     marginVertical: 2,
-    backgroundColor: AccentColor,
+  },
+  chipStack: {
+    flex: 1,
   },
   chipTitle: {
     flex: 1,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  chipTitleWrapped: {
     fontSize: 11,
     lineHeight: 14,
   },
@@ -102,24 +160,14 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   banner: {
-    backgroundColor: AccentColor,
-    borderRadius: Spacing.one,
     justifyContent: 'center',
     paddingHorizontal: Spacing.one,
-    marginHorizontal: 1,
-  },
-  bannerContinuesLeft: {
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-    marginLeft: 0,
+    marginRight: StyleSheet.hairlineWidth,
   },
   bannerContinuesRight: {
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
     marginRight: 0,
   },
   bannerTitle: {
-    color: OnAccentColor,
     fontSize: 11,
     lineHeight: 14,
   },

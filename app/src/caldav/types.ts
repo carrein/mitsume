@@ -21,8 +21,36 @@ export type CalEvent = {
   recurring?: boolean;
   /** True when a reminder is armed (the VEVENT carries a VALARM). */
   alarm?: boolean;
+  /** Source calendar's CalDAV color (#RRGGBBAA), or undefined for the accent. */
+  color?: string;
   /** Original object ICS — required to edit while preserving unknown properties. */
   raw: string;
+};
+
+/** Repeat presets the editor can write; anything else reads as 'custom' (read-only). */
+export type RecurrencePreset =
+  | 'daily'
+  | 'weekdays'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly';
+
+/**
+ * Recurrence to write as an RRULE. `until` (last possible day, inclusive, local)
+ * and `count` are mutually exclusive; neither means the series repeats forever.
+ */
+export type RecurrenceInput = {
+  preset: RecurrencePreset;
+  until?: Date;
+  count?: number;
+};
+
+/**
+ * The event's single display reminder. Minutes BEFORE the (occurrence) start;
+ * negative values fire after it — the all-day "morning of 9:00" preset is -540.
+ */
+export type AlarmInput = {
+  offsetMinutes: number;
 };
 
 /** Fields for creating an event. */
@@ -33,17 +61,23 @@ export type EventInput = {
   allDay: boolean;
   location?: string;
   description?: string;
+  recurrence?: RecurrenceInput;
+  alarm?: AlarmInput;
 };
 
 /**
  * Editable fields (whole-series; single-occurrence editing is deferred). Include only
  * fields that actually changed — untouched properties (e.g. an Apple TZID DTSTART)
  * are then left byte-identical. `allDay` describes how start/end should be written
- * and must be set whenever start/end are present.
+ * and must be set whenever start/end are present. For `recurrence`/`alarm`,
+ * null removes the RRULE / our VALARM; undefined leaves them untouched.
  */
 export type EventChanges = Partial<
   Pick<
     EventInput,
     'summary' | 'start' | 'end' | 'location' | 'description' | 'allDay'
   >
->;
+> & {
+  recurrence?: RecurrenceInput | null;
+  alarm?: AlarmInput | null;
+};

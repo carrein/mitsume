@@ -79,11 +79,17 @@ export const FontFamilyBold = 'Satoshi_bold';
 /**
  * Brand accent (matches the app icon). Duplicated in static config that can't
  * import TS — keep in sync when changing: app.json (adaptiveIcon + splash
- * backgroundColor) and public/manifest.json (theme_color).
+ * backgroundColor), public/manifest.json (theme_color), and
+ * android/app/src/main/res/values/colors.xml (iconBackground +
+ * splashscreen_background).
  */
 // Firefox brand palette (brandcolorcode.com/firefox): orange #FFBD4F,
 // blue #0060E0, yellow #FFEA7F, red #FF505F, pink #E11586, purple #B933E1.
 export const AccentColor = '#FFBD4F';
+/** Burnt amber — a stronger orange than AccentColor, for deliberate emphasis
+ * where the light accent is too faint. Opt-in per use; the default stays
+ * AccentColor. (Not from the Firefox palette.) */
+export const BrandColor = '#F5820D';
 /** Destructive actions / validation errors. */
 export const DangerColor = '#FF505F';
 /** Text/icons on an accent-colored surface, in both schemes — dark ink, since

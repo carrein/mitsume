@@ -3,8 +3,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { parseDay, toTimeString } from '@/utils/date';
+import { AccentColor, Spacing } from '@/constants/theme';
+import { dayLabel, toTimeString } from '@/utils/date';
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -18,14 +18,6 @@ type Props = {
 function compareEvents(a: CalEvent, b: CalEvent): number {
   if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
   return a.start.getTime() - b.start.getTime();
-}
-
-function dayLabel(day: string): string {
-  return (parseDay(day) ?? new Date()).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
 }
 
 /**
@@ -59,6 +51,13 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
                       }
                       style={styles.row}
                     >
+                      {/* Source-calendar color accent (theme accent if none). */}
+                      <View
+                        style={[
+                          styles.dot,
+                          { backgroundColor: event.color ?? AccentColor },
+                        ]}
+                      />
                       <View style={styles.time}>
                         {event.allDay ? (
                           <ThemedText type="small" themeColor="textSecondary">
@@ -131,6 +130,12 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.two,
     borderRadius: Spacing.one,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 4, // sit level with the first text line
   },
   time: {
     width: 52,

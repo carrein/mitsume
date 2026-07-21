@@ -3,18 +3,23 @@
 import IcalExpander from 'ical-expander';
 import ICAL from 'ical.js';
 
+import { applyRecurrence } from './rrule';
 import type { CalEvent, EventChanges, EventInput } from './types';
+import { applyAlarm } from './valarm';
 
 /**
  * Expand one calendar object's ICS into concrete CalEvents overlapping [start, end).
- * Handles single and recurring events uniformly via ical-expander.
+ * Handles single and recurring events uniformly via ical-expander. `color` is the
+ * source calendar's CalDAV color, passed in as a plain string to keep this module
+ * tsdav-free.
  */
 export function expandEvents(
   ics: string,
   url: string,
   etag: string,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
+  color: string | undefined
 ): CalEvent[] {
   const expander = new IcalExpander({ ics, maxIterations: 1000 });
   const { events, occurrences } = expander.between(rangeStart, rangeEnd);
@@ -43,6 +48,7 @@ export function expandEvents(
         ? { recurring: true }
         : {}),
       ...(vevent.getFirstSubcomponent('valarm') ? { alarm: true } : {}),
+      ...(color ? { color } : {}),
       raw: ics,
     };
   };
@@ -106,6 +112,9 @@ export function buildEventICS(input: EventInput, uid: string): string {
     vevent.updatePropertyWithValue('location', input.location);
   if (input.description)
     vevent.updatePropertyWithValue('description', input.description);
+  // After the DTSTART write — the weekdays rotation and UNTIL type read it.
+  if (input.recurrence) applyRecurrence(vevent, input.recurrence);
+  if (input.alarm) applyAlarm(vevent, input.alarm);
   vevent.updatePropertyWithValue('dtstamp', ICAL.Time.now());
 
   vcalendar.addSubcomponent(vevent);
@@ -140,6 +149,12 @@ export function editPreserving(ics: string, changes: EventChanges): string {
     event.startDate = start;
     event.endDate = end;
   }
+  // After any DTSTART change — the weekdays rotation reads the new value.
+  // The editor only emits these for rules/alarms it owns ('custom'/'foreign'
+  // prefills never produce a change), so foreign data is never rewritten.
+  if (changes.recurrence !== undefined)
+    applyRecurrence(vevent, changes.recurrence);
+  if (changes.alarm !== undefined) applyAlarm(vevent, changes.alarm);
 
   // Bump revision metadata only — do NOT touch X-APPLE-*, ATTENDEE, ORGANIZER.
   vevent.updatePropertyWithValue('last-modified', ICAL.Time.now());
