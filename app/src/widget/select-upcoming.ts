@@ -48,5 +48,7 @@ export function toWidgetEvent(e: CalEvent): WidgetEvent {
     ...(plainLink && plainLink !== meetingLink ? { link: plainLink } : {}),
     ...(e.recurring ? { recurring: true } : {}),
     ...(e.alarm ? { alarm: true } : {}),
+    ...(e.color ? { color: e.color } : {}),
+    ...(e.icon ? { icon: e.icon } : {}),
   };
 }

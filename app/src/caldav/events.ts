@@ -3,6 +3,7 @@
 import * as Crypto from 'expo-crypto';
 
 import {
+  calendarIcon,
   calendarName,
   getCalendarFor,
   getCalendars,
@@ -29,7 +30,7 @@ function ensureOk(res: Response, action: string): void {
 }
 
 /** Fetch + expand all events overlapping [rangeStart, rangeEnd) across every
- *  calendar, tagging each event with its source calendar's color. */
+ *  calendar, tagging each event with its source calendar's color + marker icon. */
 export async function fetchMonth(
   rangeStart: Date,
   rangeEnd: Date
@@ -48,6 +49,10 @@ export async function fetchMonth(
         calendar,
         timeRange,
       });
+      const source = {
+        color: calendar.calendarColor,
+        icon: calendarIcon(calendar),
+      };
       const events: CalEvent[] = [];
       for (const obj of objects) {
         if (!obj.data) continue;
@@ -58,7 +63,7 @@ export async function fetchMonth(
             obj.etag ?? '',
             rangeStart,
             rangeEnd,
-            calendar.calendarColor
+            source
           )
         );
       }

@@ -1,3 +1,10 @@
+/** A calendar-specific marker glyph, keyed off the source calendar (not the
+ *  event) — e.g. the birthday calendar draws a gift instead of the all-day sun. */
+export type EventIcon = 'gift';
+
+/** Per-calendar rendering hints tagged onto each event during expansion. */
+export type EventSource = { color?: string; icon?: EventIcon };
+
 /** A concrete, UI-facing calendar event (one occurrence for a recurring series). */
 export type CalEvent = {
   /** Stable key for lists/markers: `uid:occurrenceStart` (recurrence-safe). */
@@ -23,6 +30,8 @@ export type CalEvent = {
   alarm?: boolean;
   /** Source calendar's CalDAV color (#RRGGBBAA), or undefined for the accent. */
   color?: string;
+  /** Calendar-specific marker glyph (e.g. gift for the birthday calendar). */
+  icon?: EventIcon;
   /** Original object ICS — required to edit while preserving unknown properties. */
   raw: string;
 };

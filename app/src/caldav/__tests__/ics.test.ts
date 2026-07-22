@@ -195,28 +195,18 @@ describe('expandEvents', () => {
   const start = new Date('2026-06-01T00:00:00Z');
   const end = new Date('2026-07-01T00:00:00Z');
 
-  it('tags each event with the source calendar color when provided', () => {
-    const [ev] = expandEvents(
-      TIMED,
-      '/c/COLOR-1.ics',
-      'e1',
-      start,
-      end,
-      '#f8708cff'
-    );
+  it('tags each event with the source calendar color + icon when provided', () => {
+    const [ev] = expandEvents(TIMED, '/c/COLOR-1.ics', 'e1', start, end, {
+      color: '#f8708cff',
+      icon: 'gift',
+    });
     expect(ev.color).toBe('#f8708cff');
+    expect(ev.icon).toBe('gift');
   });
 
-  it('omits color entirely when none is provided', () => {
-    const [ev] = expandEvents(
-      TIMED,
-      '/c/COLOR-1.ics',
-      'e1',
-      start,
-      end,
-      undefined
-    );
-    expect(ev.color).toBeUndefined();
+  it('omits color/icon entirely when the source is empty', () => {
+    const [ev] = expandEvents(TIMED, '/c/COLOR-1.ics', 'e1', start, end, {});
     expect('color' in ev).toBe(false);
+    expect('icon' in ev).toBe(false);
   });
 });

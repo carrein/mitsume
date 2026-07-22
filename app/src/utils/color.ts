@@ -18,6 +18,17 @@ export function readableTextColor(hex: string): '#1C1B22' | '#FFFFFF' {
   return luminance > 0.179 ? '#1C1B22' : '#FFFFFF';
 }
 
+/**
+ * Normalize a hex color to #RRGGBB — expands #RGB shorthand and drops the alpha
+ * byte of #RRGGBBAA (SVG fills and other 6-digit consumers). Returns the input
+ * unchanged when it isn't recognizable hex.
+ */
+export function rgbHex(hex: string): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return hex;
+  return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** [r, g, b] 0–255 from a hex string, or null when it isn't valid hex. */
 function parseHex(hex: string): [number, number, number] | null {
   let h = hex.replace(/^#/, '');

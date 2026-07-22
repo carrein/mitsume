@@ -139,6 +139,23 @@ describe('toWidgetEvent', () => {
     expect('alarm' in toWidgetEvent(event)).toBe(false);
   });
 
+  it('carries the source calendar color + icon only when present', () => {
+    const event = mkEvent(
+      'birthday',
+      new Date(Date.UTC(2026, 7, 1, 0, 0)),
+      new Date(Date.UTC(2026, 7, 2, 0, 0))
+    );
+    const tagged = toWidgetEvent({
+      ...event,
+      color: '#f8708cff',
+      icon: 'gift',
+    });
+    expect(tagged.color).toBe('#f8708cff');
+    expect(tagged.icon).toBe('gift');
+    expect('color' in toWidgetEvent(event)).toBe(false);
+    expect('icon' in toWidgetEvent(event)).toBe(false);
+  });
+
   it('routes meeting links to meetingLink, without a duplicate link line', () => {
     const event = mkEvent(
       'standup',

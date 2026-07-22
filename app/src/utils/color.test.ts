@@ -1,4 +1,4 @@
-import { readableTextColor } from './color';
+import { readableTextColor, rgbHex } from './color';
 
 describe('readableTextColor', () => {
   it('picks light text on dark fills', () => {
@@ -24,5 +24,24 @@ describe('readableTextColor', () => {
   it('falls back to dark on a malformed string', () => {
     expect(readableTextColor('nope')).toBe('#1C1B22');
     expect(readableTextColor('')).toBe('#1C1B22');
+  });
+});
+
+describe('rgbHex', () => {
+  it('drops the alpha byte of #RRGGBBAA', () => {
+    expect(rgbHex('#f8708cff')).toBe('#f8708c');
+    expect(rgbHex('#FFBD4FFF')).toBe('#ffbd4f');
+  });
+
+  it('passes #RRGGBB through (normalized to lowercase)', () => {
+    expect(rgbHex('#FFBD4F')).toBe('#ffbd4f');
+  });
+
+  it('expands #RGB shorthand', () => {
+    expect(rgbHex('#f0a')).toBe('#ff00aa');
+  });
+
+  it('returns a non-hex string unchanged', () => {
+    expect(rgbHex('nope')).toBe('nope');
   });
 });

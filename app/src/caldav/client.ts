@@ -2,6 +2,8 @@ import { DAVClient, type DAVCalendar } from 'tsdav';
 
 import { DAV } from '@/config';
 
+import type { EventIcon } from './types';
+
 // Lazily-created, cached CalDAV client + calendar list. Online-first: a single
 // logged-in client is reused across calls. A failed connect/discovery resets the
 // cache so the next call retries rather than replaying a rejected promise.
@@ -13,6 +15,11 @@ let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 // known display name and fall back to discovery order. Personal single-user
 // app — safe to hardcode; update here if the calendar is renamed server-side.
 const DEFAULT_CALENDAR_NAME = 'carrein-calendar';
+
+// Per-calendar marker glyph, by calendar name — the one place (with
+// DEFAULT_CALENDAR_NAME) that personal calendar identity is hardcoded. Basil has
+// no cake, so the birthday calendar draws a gift instead of the generic sun.
+const CALENDAR_ICON: Record<string, EventIcon> = { 'carrein-birthday': 'gift' };
 
 async function connect(): Promise<DAVClient> {
   // Credential-less by default — the reverse proxy injects Authorization on
@@ -64,6 +71,12 @@ export function calendarName(calendar: DAVCalendar): string {
   if (typeof name === 'string' && name.trim()) return name.trim();
   const tail = calendar.url.replace(/\/+$/, '').split('/').pop() ?? '';
   return decodeURIComponent(tail) || calendar.url;
+}
+
+/** The calendar's marker glyph (CALENDAR_ICON), or undefined for the generic
+ *  sun/repeat/alarm markers. */
+export function calendarIcon(calendar: DAVCalendar): EventIcon | undefined {
+  return CALENDAR_ICON[calendarName(calendar).toLowerCase()];
 }
 
 function pickDefault(calendars: DAVCalendar[]): DAVCalendar {

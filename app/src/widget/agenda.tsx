@@ -17,6 +17,7 @@ import {
 import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
+  GiftOutlineBody,
   NotificationOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
@@ -29,6 +30,7 @@ import {
   OnAccentColor,
   type ThemeColor,
 } from '@/constants/theme';
+import { rgbHex } from '@/utils/color';
 import { toTimeString } from '@/utils/date';
 
 import { groupByDay, headerDate, linkHost, type WidgetDayItem } from './format';
@@ -47,9 +49,12 @@ const basilSvg = (fill: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
 const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
-const SUN_ICON = basilSvg(AccentColor, SunOutlineBody);
-const ALARM_ICON = basilSvg(AccentColor, NotificationOutlineBody);
-const REPEAT_ICON = basilSvg(AccentColor, RefreshOutlineBody);
+
+/** A per-event marker glyph (sun / repeat / alarm), tinted by the event's
+ *  source-calendar color (alpha stripped for the SVG fill); uncolored /
+ *  default-calendar events keep the theme accent. */
+const markerSvg = (color: string | undefined, body: string) =>
+  basilSvg(rgbHex(color ?? AccentColor), body);
 
 // Shared style fragments — the widget's tiny design system. Sizes are plain
 // literals by convention (the widget is its own design surface; see the
@@ -100,8 +105,8 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
  */
 function StatusIcons({ event }: { event: WidgetEvent }) {
   const icons = [
-    ...(event.recurring ? [REPEAT_ICON] : []),
-    ...(event.alarm ? [ALARM_ICON] : []),
+    ...(event.recurring ? [markerSvg(event.color, RefreshOutlineBody)] : []),
+    ...(event.alarm ? [markerSvg(event.color, NotificationOutlineBody)] : []),
   ];
   return (
     <FlexWidget
@@ -187,7 +192,14 @@ function EventRow({
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
         {asAllDay ? (
-          <SvgWidget svg={SUN_ICON} style={MARKER_ICON} />
+          // Birthday-calendar events get a gift; others keep the generic sun.
+          <SvgWidget
+            svg={markerSvg(
+              event.color,
+              event.icon === 'gift' ? GiftOutlineBody : SunOutlineBody
+            )}
+            style={MARKER_ICON}
+          />
         ) : (
           <TextWidget
             text={toTimeString(new Date(event.start))}

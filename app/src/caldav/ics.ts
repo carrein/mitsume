@@ -4,14 +4,14 @@ import IcalExpander from 'ical-expander';
 import ICAL from 'ical.js';
 
 import { applyRecurrence } from './rrule';
-import type { CalEvent, EventChanges, EventInput } from './types';
+import type { CalEvent, EventChanges, EventInput, EventSource } from './types';
 import { applyAlarm } from './valarm';
 
 /**
  * Expand one calendar object's ICS into concrete CalEvents overlapping [start, end).
- * Handles single and recurring events uniformly via ical-expander. `color` is the
- * source calendar's CalDAV color, passed in as a plain string to keep this module
- * tsdav-free.
+ * Handles single and recurring events uniformly via ical-expander. `source` carries
+ * the calendar's rendering hints (color + marker icon) as plain data, so this module
+ * stays tsdav-free.
  */
 export function expandEvents(
   ics: string,
@@ -19,7 +19,7 @@ export function expandEvents(
   etag: string,
   rangeStart: Date,
   rangeEnd: Date,
-  color: string | undefined
+  source: EventSource = {}
 ): CalEvent[] {
   const expander = new IcalExpander({ ics, maxIterations: 1000 });
   const { events, occurrences } = expander.between(rangeStart, rangeEnd);
@@ -48,7 +48,8 @@ export function expandEvents(
         ? { recurring: true }
         : {}),
       ...(vevent.getFirstSubcomponent('valarm') ? { alarm: true } : {}),
-      ...(color ? { color } : {}),
+      ...(source.color ? { color: source.color } : {}),
+      ...(source.icon ? { icon: source.icon } : {}),
       raw: ics,
     };
   };

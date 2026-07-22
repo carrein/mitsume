@@ -3,6 +3,7 @@
  * JSON-safe snapshot (dates as ISO strings, no ICS payload) so the last-good
  * file stays small across headless runs.
  */
+import type { EventIcon } from '@/caldav/types';
 
 /** One upcoming event as the widget renders it. */
 export type WidgetEvent = {
@@ -22,6 +23,10 @@ export type WidgetEvent = {
   recurring?: boolean;
   /** A reminder is armed (VALARM present) — rendered as a bell marker. */
   alarm?: boolean;
+  /** Source calendar's CalDAV color (#RRGGBBAA) — tints the row's markers. */
+  color?: string;
+  /** Calendar-specific marker glyph — e.g. 'gift' swaps the all-day sun. */
+  icon?: EventIcon;
 };
 
 /** Last successful fetch, persisted between headless widget runs. */
